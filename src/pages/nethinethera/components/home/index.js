@@ -1,0 +1,10 @@
+export { default as HeroSection } from './HeroSection';
+export { default as ThemeRevealSection } from './ThemeRevealSection';
+export { default as TrailerPreviewSection } from './TrailerPreviewSection';
+export { default as InvitePreviewSection } from './InvitePreviewSection';
+export { default as EventDetailsSection } from './EventDetailsSection';
+export { default as AgendaPreviewSection } from './AgendaPreviewSection';
+export { default as SpotlightSection } from './SpotlightSection';
+export { default as SponsorsSection } from './SponsorsSection';
+export { default as FooterCTASection } from './FooterCTASection';
+export { default as ChampionshipPreviewSection } from './ChampionshipPreviewSection';

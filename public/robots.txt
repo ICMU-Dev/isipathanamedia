@@ -1,0 +1,23 @@
+# Isipathana College Media Unit – isipathanamedia.online
+User-agent: *
+Allow: /
+
+# Public pages
+Allow: /about
+Allow: /news
+Allow: /nethinethera
+Allow: /live
+
+# Exclude admin and internal routes from indexing
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /*/dashboard
+Disallow: /*/dashboard/*
+Disallow: /auth/
+Disallow: /share-target
+
+# Crawl-delay (polite)
+Crawl-delay: 1
+
+# Sitemap
+Sitemap: https://isipathanamedia.online/sitemap.xml

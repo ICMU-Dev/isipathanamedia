@@ -9,8 +9,8 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-user-index",
 };
 
-const vapidPublicKey = "BDvKzqdXgPr7u-kietdGltOi9aPtHMB5jOJCSSgJ7sBfW6DRslAV130dXy4zp5FEKm7V3FpSSHeC7zyhqHD23xc";
-const vapidPrivateKey = "3w5ntLjZxzJvkC4pgArq2I5MywiP19pCSTYpTg1LS5E";
+const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "";
+const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY") || "";
 
 webpush.setVapidDetails("mailto:dev.icmu@gmail.com", vapidPublicKey, vapidPrivateKey);
 

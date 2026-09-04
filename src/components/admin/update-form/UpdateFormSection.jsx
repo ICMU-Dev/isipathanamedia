@@ -13,6 +13,7 @@ const UpdateFormSection = ({
   extractData,
   handleSave,
   navigate,
+  onCancel,
 }) => {
   return (
     <div className="w-full flex flex-col flex-1 p-1 bg-transparent relative">
@@ -37,9 +38,10 @@ const UpdateFormSection = ({
       {/* Actions */}
       <div className="mt-6 pt-4 border-t border-white/[0.06]  flex gap-3">
         <button
-          onClick={() => navigate(-1)}
+          type="button"
+          onClick={onCancel || (() => navigate(-1))}
           disabled={saving || extracting}
-          className="flex-[0.4] px-3 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-[13px] font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none">
+          className="flex-[0.4] px-3 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-[13px] font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer">
           Cancel
         </button>
         {canEditMetadata && (

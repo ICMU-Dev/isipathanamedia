@@ -28,7 +28,7 @@ const BroadcasterDashboard = () => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          window.location.href = targetUrl;
+          window.location.replace(targetUrl);
           return 0;
         }
         return prev - 1;
@@ -122,12 +122,13 @@ const BroadcasterDashboard = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-            <a
-              href={targetUrl}
-              className="flex items-center gap-2.5 px-7 py-3.5 bg-white text-black hover:bg-zinc-200 font-bold rounded-2xl transition-all duration-200 text-xs uppercase tracking-wider shadow-lg hover:scale-[1.02] active:scale-95">
+            <button
+              type="button"
+              onClick={() => window.location.replace(targetUrl)}
+              className="flex items-center gap-2.5 px-7 py-3.5 bg-white text-black hover:bg-zinc-200 font-bold rounded-2xl transition-all duration-200 text-xs uppercase tracking-wider shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer">
               <span>Launch Terminal Now</span>
-              <ExternalLink size={15} />
-            </a>
+              <ArrowRight size={15} />
+            </button>
 
             <Link
               to={hasSuperAdminAccess ? basePath : hasAdminAccess ? `${basePath}/dashboard` : "/"}

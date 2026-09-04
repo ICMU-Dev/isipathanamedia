@@ -1,0 +1,1 @@
+{"nodes": [{"id": "changelog", "label": "Changelog", "file_type": "document", "source_file": "CHANGELOG.md", "rationale": "Documents the evolution of the ICMU Web Platform, including GA4 integration and removal of MPMU/Nethinethera modules."}], "edges": [], "hyperedges": []}

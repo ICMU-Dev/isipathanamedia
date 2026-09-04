@@ -1,0 +1,1 @@
+{"nodes": [{"id": "newsroom_overhaul", "label": "Newsroom Overhaul Plan", "file_type": "document", "source_file": "newsroom-overhaul.md", "rationale": "Detailed technical specification for migrating editorial workflows, fixing security leaks, and updating RLS policies."}], "edges": [], "hyperedges": []}

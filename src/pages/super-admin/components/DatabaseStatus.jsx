@@ -26,7 +26,7 @@ const StorageMetricCard = ({
   percent,
 }) => {
   return (
-    <div className="bg-[#09090b] border border-white/[0.06]  rounded-2xl p-3 sm:p-6 flex flex-col relative overflow-hidden shadow-lg group hover:border-white/20 transition-all duration-500">
+    <div className="bg-[#121215]/80 border border-white/[0.08] backdrop-blur-xl rounded-[22px] p-3 sm:p-6 flex flex-col relative overflow-hidden shadow-lg group hover:border-white/20 transition-all duration-500">
       <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-[50px] -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-white/10 transition-all duration-700"></div>
 
       <div className="flex justify-between items-start mb-6">
@@ -58,7 +58,7 @@ const StorageMetricCard = ({
                 ? "text-red-400"
                 : percent > 60
                   ? "text-amber-400"
-                  : "text-emerald-400"
+                  : "text-green-400"
             }>
             {percent < 1 && percent > 0 ? "< 1" : percent.toFixed(1)}%
           </span>
@@ -70,7 +70,7 @@ const StorageMetricCard = ({
                 ? "bg-red-500"
                 : percent > 60
                   ? "bg-amber-500"
-                  : "bg-emerald-500"
+                  : "bg-green-500"
             }`}
             style={{
               width: `${Math.min(Math.max(percent, 2), 100)}%`,
@@ -158,7 +158,7 @@ const DatabaseStatus = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-2 mb-2">
         <div>
           <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-            <Server size={24} className="text-emerald-400" />
+            <Server size={24} className="text-green-400" />
             Infrastructure Status
           </h3>
           <p className="text-zinc-400 text-sm mt-1 max-w-md">
@@ -170,7 +170,7 @@ const DatabaseStatus = () => {
         <button
           onClick={fetchMetrics}
           disabled={loading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white/5 border border-white/5 hover:bg-white hover:text-black text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.12] text-zinc-200 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed">
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           {loading ? "Scanning..." : "Refresh Data"}
         </button>
@@ -194,7 +194,7 @@ const DatabaseStatus = () => {
           unitUsed="MB"
           unitTotal="MB"
           icon={Database}
-          color="text-emerald-400"
+          color="text-green-400"
           percent={dbPercent}
         />
         <StorageMetricCard
@@ -221,10 +221,10 @@ const DatabaseStatus = () => {
 
       {/* Detail breakdown or advice */}
       <div className="grid grid-cols-1 text-balance md:grid-cols-2 gap-5 mt-6">
-        <div className="bg-[#09090b] border border-white/[0.06]  rounded-3xl p-6 flex flex-col">
+        <div className="bg-[#121215]/80 border border-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 flex flex-col shadow-xl">
           <div className="flex items-center gap-3 mb-4">
             <ImageIcon size={20} className="text-zinc-400" />
-            <h4 className="text-sm font-medium  tracking-wider text-white">
+            <h4 className="text-sm font-medium tracking-wider text-white">
               Media Management
             </h4>
           </div>
@@ -234,7 +234,7 @@ const DatabaseStatus = () => {
           </p>
           <button
             onClick={() => setIsMediaLibraryOpen(true)}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-white text-black hover:bg-zinc-200 rounded-2xl text-sm font-bold transition-all shadow-md">
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-green-500 hover:bg-green-400 text-zinc-950 rounded-2xl text-sm font-bold transition-all shadow-[0_0_20px_rgba(34,197,94,0.2)] active:scale-[0.99]">
             <ImageIcon size={18} />
             Open Media Library
           </button>

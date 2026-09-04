@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "./AuthContext";
+import { isAdmin as checkIsAdmin, isWriter as checkIsWriter } from "../utils/roles";
 
 const DataContext = createContext();
 
@@ -186,20 +187,32 @@ export const DataProvider = ({ children }) => {
       if (error) throw error;
       if (data) {
         // Access Control
+        // Public: Everyone
+        // Unlisted: Anyone with the direct link
+        // Private: Logged-in roles only (super admin, admin, writer, broadcaster, etc.)
+        // Draft/Pending: Admin or author only
         let isAuthorized = false;
         
         if (currentUser) {
-          const role = currentUser?.role?.toLowerCase();
-          const isAdmin = role === 'admin' || role === 'super_admin' || role === 'super-admin' || role === 'superadmin';
-          if (isAdmin) {
+          const userRole = currentUser?.role;
+          if (checkIsAdmin(userRole)) {
+            // Admins & super-admins can view all statuses and visibilities
             isAuthorized = true;
-          } else if (currentUser?.id === data.submitted_by) {
+          } else if (currentUser.id === data.submitted_by) {
+            // The author can view their own article regardless of status/visibility
             isAuthorized = true;
           }
         }
         
-        if (!isAuthorized) {
-          if (data.status === 'published' && data.visibility === 'public') {
+        if (!isAuthorized && data.status === "published") {
+          if (data.visibility === "public") {
+            // Public: visible to all
+            isAuthorized = true;
+          } else if (data.visibility === "unlisted") {
+            // Unlisted: visible to anyone who has the direct link
+            isAuthorized = true;
+          } else if (data.visibility === "private" && currentUser) {
+            // Private: visible to any logged-in user with an account/role
             isAuthorized = true;
           }
         }
@@ -252,7 +265,10 @@ export const DataProvider = ({ children }) => {
   const fetchMessages = useCallback(async (force = false) => {
     if (fetchedRef.current.messages && !force) return;
     try {
-      const { data, error } = await supabase.from("messages").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .order("created_at", { ascending: false });
       if (error) {
         if (error.code === "PGRST205" || error.message?.includes("schema cache")) {
           setMessages([]);
@@ -290,6 +306,35 @@ export const DataProvider = ({ children }) => {
     // This removes the need for individual pages to call fetchData().
     fetchData();
   }, [fetchData]);
+
+  // Window focus & visibility-change listener to auto-sync fresh data
+  const lastFocusFetchRef = useRef(Date.now());
+  useEffect(() => {
+    const handleSyncOnFocus = () => {
+      // Throttle to at most once every 30 seconds to prevent hammering DB on rapid tab switches
+      const now = Date.now();
+      if (now - lastFocusFetchRef.current > 30_000) {
+        lastFocusFetchRef.current = now;
+        fetchData(true);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleSyncOnFocus();
+      }
+    };
+
+    window.addEventListener("focus", handleSyncOnFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleSyncOnFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchData]);
+
+  const hasConnectedRef = useRef(false);
 
   // Realtime listeners (syncs updates globally via WebSocket, zero polling)
   useEffect(() => {
@@ -332,20 +377,41 @@ export const DataProvider = ({ children }) => {
           table: "news",
         },
         (payload) => {
-          setNews((prev) => {
-            if (payload.eventType === "INSERT") {
-              // Prevent duplicates if this exact client just inserted it
-              if (prev.some((n) => n.id === payload.new.id)) return prev;
-              return [payload.new, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          if (payload.eventType === "DELETE") {
+            setNews((prev) => prev.filter((n) => n.id !== payload.old.id));
+            return;
+          }
+          if (payload.eventType === "INSERT") {
+            if (payload.new) {
+              const patched = patchImageUrl(payload.new);
+              setNews((prev) => {
+                if (prev.some((n) => n.id === patched.id)) return prev;
+                return [patched, ...prev].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+              });
             }
-            if (payload.eventType === "UPDATE") {
-              return prev.map((n) => (n.id === payload.new.id ? { ...n, ...payload.new } : n));
+            return;
+          }
+          if (payload.eventType === "UPDATE") {
+            if (payload.new && payload.new.title) {
+              const patched = patchImageUrl(payload.new);
+              setNews((prev) => prev.map((n) => (n.id === patched.id ? { ...n, ...patched } : n)));
+            } else if (payload.new?.id) {
+              // If large text truncated payload.new, fetch full record
+              supabase
+                .from("news")
+                .select("id, title, content, image, date, category, author, tags, type, status, submitted_by, original_link, created_at, visibility, needs_attention, review_notes")
+                .eq("id", payload.new.id)
+                .maybeSingle()
+                .then(({ data }) => {
+                  if (data) {
+                    const patched = patchImageUrl(data);
+                    setNews((prev) => prev.map((n) => (n.id === patched.id ? { ...n, ...patched } : n)));
+                  }
+                })
+                .catch(() => {});
             }
-            if (payload.eventType === "DELETE") {
-              return prev.filter((n) => n.id !== payload.old.id);
-            }
-            return prev;
-          });
+            return;
+          }
         }
       )
       // 3. Listen for team changes
@@ -420,26 +486,23 @@ export const DataProvider = ({ children }) => {
           });
         }
       )
-      .on(
-        "system",
-        { event: "*" },
-        (payload) => {
-          // If the socket reconnects, trigger a silent refetch to catch up on missed data
-          // without blasting Supabase by only fetching once after a reconnection event.
-          if (payload.status === "SUBSCRIBED" && payload.event === "CHANNEL_STATE") {
-            // Wait a bit to ensure stability, then force refresh
-            setTimeout(() => {
-              fetchData(true);
-            }, 1000);
+      .subscribe((status, err) => {
+        if (status === "SUBSCRIBED") {
+          // If socket reconnects after initial connection, silent refetch to catch up on missed data
+          if (hasConnectedRef.current) {
+            fetchData(true);
+          } else {
+            hasConnectedRef.current = true;
           }
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[DataContext] Realtime subscription status:", status, err);
         }
-      )
-      .subscribe();
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchData]);
 
   const updateSiteConfig = async (newConfig) => {
     const { error } = await supabase.from("assets").upsert({
@@ -461,42 +524,58 @@ export const DataProvider = ({ children }) => {
       .from("news")
       .insert([article])
       .select();
-    if (!error && data) {
-      fetchedRef.current.news = false;
-      await fetchNews();
+    if (!error && data && data[0]) {
+      const patched = patchImageUrl(data[0]);
+      setNews((prev) => {
+        if (prev.some((n) => n.id === patched.id)) return prev;
+        return [patched, ...prev].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+      });
+      return { data, error: null };
+    }
+    if (error) {
+      console.error("[DataContext] Error adding news:", error.message);
+      return { data: null, error };
     }
   };
   const updateNews = async (id, updated) => {
+    setNews((prevNews) => prevNews.map((n) => (n.id === id ? { ...n, ...updated } : n)));
     const { error } = await supabase.from("news").update(updated).eq("id", id);
-    if (!error) {
-      setNews((prevNews) => prevNews.map((n) => (n.id === id ? { ...n, ...updated } : n)));
-      fetchedRef.current.news = false;
-      await fetchNews();
+    if (error) {
+      console.error("[DataContext] Error updating news:", error.message);
+      fetchNews(true); // rollback on error
+      return false;
     }
+    return true;
   };
   const deleteNews = async (id) => {
+    setNews((prevNews) => prevNews.filter((n) => n.id !== id));
     const { error } = await supabase.from("news").delete().eq("id", id);
-    if (!error) {
-      setNews((prevNews) => prevNews.filter((n) => n.id !== id));
-      fetchedRef.current.news = false;
-      await fetchNews();
+    if (error) {
+      console.error("[DataContext] Error deleting news:", error.message);
+      fetchNews(true); // rollback on error
+      return false;
     }
+    return true;
   };
   const deleteManyNews = async (ids) => {
+    setNews((prevNews) => prevNews.filter((n) => !ids.includes(n.id)));
     const { error } = await supabase.from("news").delete().in("id", ids);
-    if (!error) {
-      setNews((prevNews) => prevNews.filter((n) => !ids.includes(n.id)));
-      fetchedRef.current.news = false;
-      await fetchNews();
+    if (error) {
+      console.error("[DataContext] Error deleting multiple news:", error.message);
+      fetchNews(true); // rollback on error
+      return false;
     }
+    return true;
   };
   const updateManyNews = async (ids, updated) => {
+    setNews((prevNews) => prevNews.map((n) => (ids.includes(n.id) ? { ...n, ...updated } : n)));
     const { error } = await supabase.from("news").update(updated).in("id", ids);
-    if (!error) {
-      setNews((prevNews) => prevNews.map((n) => (ids.includes(n.id) ? { ...n, ...updated } : n)));
-      fetchedRef.current.news = false;
-      await fetchNews();
+    if (error) {
+      console.error("[DataContext] Error updating multiple news:", error.message);
+      fetchNews(true); // rollback on error
+      return false;
     }
+    return true;
   };
 
   // TEAM ------------------------

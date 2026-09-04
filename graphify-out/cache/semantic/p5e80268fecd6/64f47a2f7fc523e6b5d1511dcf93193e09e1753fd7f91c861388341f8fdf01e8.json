@@ -1,0 +1,1 @@
+{"nodes": [{"id": "readme", "label": "ICMU Web Platform README", "file_type": "document", "source_file": "README.md", "rationale": "Provides the high-level architecture, tech stack (React, Supabase, GA4), and setup instructions."}], "edges": [], "hyperedges": []}

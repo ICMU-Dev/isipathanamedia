@@ -334,11 +334,19 @@ export const AuthProvider = ({ children }) => {
             )
             .subscribe();
 
-        // 5 seconds polling fallback
-        const interval = setInterval(checkSuspension, 5 * 1000);
+        // 2-minute polling fallback (Realtime handles instant suspension; interval is just a safety net)
+        const interval = setInterval(checkSuspension, 120 * 1000);
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                checkSuspension();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
 
         return () => {
             clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibility);
             supabase.removeChannel(channel);
         };
     }, [user?.id]);

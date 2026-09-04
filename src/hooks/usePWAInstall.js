@@ -66,6 +66,7 @@ export function usePWAInstall() {
     isStandalone,
     isIOS,
     isAndroid,
+    isDesktop: !isIOS && !isAndroid,
     promptInstall,
   };
 }

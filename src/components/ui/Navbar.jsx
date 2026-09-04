@@ -207,7 +207,7 @@ const Navbar = ({ shouldAnimate }) => {
             isScrolled ? "opacity-100" : "opacity-0"
           }`}
           style={{
-            background: "linear-gradient(to bottom, #050505 20%, rgba(5,5,5,0.8) 50%, transparent 100%)"
+            background: "linear-gradient(to bottom, #050505 10%, rgba(5,5,5,0.8) 10%, transparent 80%)"
           }}
         />
 

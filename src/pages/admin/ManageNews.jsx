@@ -112,7 +112,6 @@ const ManageNews = () => {
   // Quick View State
   const [viewingArticle, setViewingArticle] = useState(null);
   const [modalView, setModalView] = useState("options");
-  const [mobilePreviewTab, setMobilePreviewTab] = useState("content");
   const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
@@ -889,45 +888,15 @@ const ManageNews = () => {
                 </button>
               </div>
 
-              {/* Mobile Segmented Switcher (Content vs Analytics) */}
-              <div className="flex sm:hidden items-center bg-white/[0.04] p-1 rounded-xl border border-white/[0.06] mb-3">
-                <button
-                  onClick={() => setMobilePreviewTab("content")}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-3xl  transition-all flex items-center justify-center gap-1.5 ${
-                    mobilePreviewTab === "content"
-                      ? "bg-white/10 text-white shadow-sm"
-                      : "text-white/40 hover:text-white"
-                  }`}
-                >
-                  <FileText size={13} /> Article Content
-                </button>
-                {viewingArticle?.type !== 'update' && (
-                  <button
-                    onClick={() => setMobilePreviewTab("analytics")}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-3xl  transition-all flex items-center justify-center gap-1.5 ${
-                      mobilePreviewTab === "analytics"
-                        ? "bg-theme-accent/20 text-theme-accent shadow-sm border border-theme-accent/30"
-                        : "text-white/40 hover:text-white"
-                    }`}
-                  >
-                    <BarChart2 size={13} /> Analytics & Info
-                  </button>
-                )}
-              </div>
-
-              {/* Side-by-side on PC (sm:flex-row), Responsive on Mobile */}
+              {/* Side-by-side on PC (sm:flex-row), Flowing layout on Mobile */}
               <div className="flex flex-col sm:flex-row gap-5 p-1 sm:p-2 max-h-[75vh] sm:max-h-[80vh] overflow-y-auto custom-scrollbar">
                 {/* Left Column: Cover Image & Analytics Card */}
-                <div
-                  className={`flex flex-col gap-3.5 sm:w-[380px] lg:w-[420px] shrink-0 ${
-                    mobilePreviewTab === "analytics" ? "flex" : "hidden sm:flex"
-                  }`}
-                >
-                  {/* Cover Image */}
-                  {viewingArticle.image ? (
-                    <div className={`w-full rounded-2xl overflow-hidden relative bg-black/40 border border-white/[0.08] shadow-md shrink-0 ${viewingArticle.type === 'update' ? '' : 'aspect-video'}`}>
+                <div className="flex flex-col gap-3.5 sm:w-[380px] lg:w-[420px] shrink-0 order-2 sm:order-1">
+                  {/* Cover Image (Desktop) */}
+                  {(viewingArticle.image || viewingArticle.image_url) ? (
+                    <div className={`hidden sm:block w-full rounded-2xl overflow-hidden relative bg-black/40 border border-white/[0.08] shadow-md shrink-0 ${viewingArticle.type === 'update' ? '' : 'aspect-video'}`}>
                       <ImageWithLoader
-                        src={viewingArticle.image}
+                        src={viewingArticle.image || viewingArticle.image_url}
                         alt={viewingArticle.title}
                         fallbackIconClassName="w-12 h-12 opacity-20 object-contain grayscale"
                         imageClassName={`w-full h-full opacity-90 transition-transform duration-500 ${viewingArticle.type === 'update' ? 'object-contain' : 'object-cover'}`}
@@ -1108,11 +1077,19 @@ const ManageNews = () => {
                 </div>
 
                 {/* Right Column: Full Article Content Reader */}
-                <div
-                  className={`flex flex-col justify-between flex-1 min-w-0 gap-4 ${
-                    mobilePreviewTab === "content" ? "flex" : "hidden sm:flex"
-                  }`}
-                >
+                <div className="flex flex-col justify-between flex-1 min-w-0 gap-4 order-1 sm:order-2">
+                  {/* Cover Image (Mobile Only - positioned at top so mobile users always see it) */}
+                  {(viewingArticle.image || viewingArticle.image_url) ? (
+                    <div className={`block sm:hidden w-full rounded-2xl overflow-hidden relative bg-black/40 border border-white/[0.08] shadow-md shrink-0 ${viewingArticle.type === 'update' ? '' : 'aspect-video'}`}>
+                      <ImageWithLoader
+                        src={viewingArticle.image || viewingArticle.image_url}
+                        alt={viewingArticle.title}
+                        fallbackIconClassName="w-12 h-12 opacity-20 object-contain grayscale"
+                        imageClassName={`w-full h-full opacity-90 transition-transform duration-500 ${viewingArticle.type === 'update' ? 'object-contain' : 'object-cover'}`}
+                      />
+                    </div>
+                  ) : null}
+
                   <div className="space-y-3.5">
                     {/* Tags & Metadata */}
                     <div className="flex flex-wrap items-center gap-2">

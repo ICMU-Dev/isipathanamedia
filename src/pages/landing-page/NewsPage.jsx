@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
+import { isAdmin as checkIsAdmin, isWriter as checkIsWriter } from "../../utils/roles";
 import {
   ArrowLeft,
   Calendar,
@@ -533,12 +534,9 @@ const NewsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const role = user?.role?.toLowerCase();
-  const isAdmin =
-    role === "admin" ||
-    role === "super_admin" ||
-    role === "super-admin" ||
-    role === "superadmin";
+  const userRole = user?.role;
+  const isAdmin = checkIsAdmin(userRole);
+  const isWriter = checkIsWriter(userRole);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const isLoadingNews = (isFetching || loading) && (!news || news.length === 0);
@@ -579,24 +577,31 @@ const NewsPage = () => {
     if (authorParam) setActiveAuthor(authorParam);
   }, [searchParams]);
 
-  // Deduplicate and filter news items (Admins see all; Public sees published only)
+  // Deduplicate and filter news items by role:
+  //   Admin / Super-Admin → see everything
+  //   Writer              → sees their own articles (any status/visibility) + published public
+  //   Public (no auth)    → sees published + public only
   const sortedNews = useMemo(() => {
     const map = new Map();
     (news || []).forEach((item) => {
       if (item && item.id && !map.has(item.id)) {
-        if (
-          isAdmin || 
-          item.submitted_by === user?.id ||
-          (item.status === "published" && item.visibility === "public")
-        ) {
-          map.set(item.id, item);
+        let canSee = false;
+        if (isAdmin) {
+          canSee = true;
+        } else if (isWriter) {
+          canSee =
+            item.submitted_by === user?.id ||
+            (item.status === "published" && item.visibility === "public");
+        } else {
+          canSee = item.status === "published" && item.visibility === "public";
         }
+        if (canSee) map.set(item.id, item);
       }
     });
     return Array.from(map.values()).sort(
       (a, b) => new Date(b.date) - new Date(a.date),
     );
-  }, [news, isAdmin]);
+  }, [news, isAdmin, isWriter, user?.id]);
 
   // Extract unique categories
   const categories = useMemo(() => {

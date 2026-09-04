@@ -32,7 +32,7 @@ export const AUTH_COOKIE_KEYS = {
  * Determines appropriate cookie domain attribute.
  * - Localhost / IP: returns empty string (standard origin cookie)
  * - Public cloud providers (*.netlify.app, *.vercel.app): returns empty string to comply with PSL
- * - Production custom domains (*.icmu.lk): returns wildcard domain (.icmu.lk) for seamless subdomain sharing
+ * - Production custom domains (*.isipathanamedia.online): returns wildcard domain (.isipathanamedia.online) for seamless subdomain sharing
  */
 function getCookieDomain() {
   if (typeof window === 'undefined') return '';
@@ -53,7 +53,7 @@ function getCookieDomain() {
 
   const parts = hostname.split('.');
   if (parts.length >= 2) {
-    // Returns e.g. '; domain=.icmu.lk'
+    // Returns e.g. '; domain=.isipathanamedia.online'
     return `; domain=.${parts.slice(-2).join('.')}`;
   }
 

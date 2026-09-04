@@ -23,6 +23,8 @@ const PWAInstallCard = () => {
       setInstalling(false);
       if (success) {
         setInstalledSuccess(true);
+      } else {
+        setShowGuide(true);
       }
     } else {
       setShowGuide((prev) => !prev);

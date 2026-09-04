@@ -353,9 +353,11 @@ const UserProfile = () => {
 
   useEffect(() => {
     const fetchGoogleAvatar = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user?.user_metadata?.avatar_url) {
-        setGoogleAvatarUrl(data.user.user_metadata.avatar_url);
+      const googlePic =
+        data?.user?.user_metadata?.avatar_url ||
+        data?.user?.user_metadata?.picture;
+      if (googlePic) {
+        setGoogleAvatarUrl(googlePic);
       }
     };
     fetchGoogleAvatar();

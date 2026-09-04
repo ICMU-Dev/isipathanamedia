@@ -72,7 +72,6 @@ const Settings = () => {
 
   const role = user?.role;
   const isSuper = isSuperAdmin(role);
-  const isSuperAdmin = isSuper;
   const isAdm = isAdmin(role);
 
   const [activeTab, setActiveTab] = useState("appearance");
@@ -510,7 +509,7 @@ const Settings = () => {
   ];
 
   // helper to resolve normalizedRole for tab filtering
-  const normalizedRole = isSuperAdmin
+  const normalizedRole = isSuper
     ? "super_admin"
     : isAdm
       ? "admin"
@@ -598,7 +597,7 @@ const Settings = () => {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-            {isSuperAdmin && (
+            {isSuper && (
               <button
                 type="button"
                 onClick={handleSaveConfig}
@@ -619,7 +618,7 @@ const Settings = () => {
                     : "No Changes"}
               </button>
             )}
-            {isSuperAdmin && (
+            {isSuper && (
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"

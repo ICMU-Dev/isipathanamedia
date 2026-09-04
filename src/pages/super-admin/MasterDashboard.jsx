@@ -46,12 +46,12 @@ import {
 const TabButton = ({ value, label, activeTab, onClick, icon: Icon }) => (
   <button
     onClick={() => onClick(value)}
-    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 sm:px-5 sm:py-3 rounded-2xl sm:rounded-2xl text-[11px] sm:text-sm font-semibold transition-all duration-300 ${
+    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer ${
       activeTab === value
-        ? "bg-white text-black shadow-md"
-        : "text-zinc-400 hover:text-white hover:bg-white/5"
+        ? "bg-white/[0.12] text-white border border-white/20 shadow-[0_2px_12px_rgba(0,0,0,0.5)] backdrop-blur-md"
+        : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent"
     }`}>
-    <Icon size={16} strokeWidth={2.5} className="sm:w-[18px] sm:h-[18px]" />
+    <Icon size={15} strokeWidth={2.2} className="sm:w-4 sm:h-4" />
     <span className="whitespace-nowrap">{label}</span>
   </button>
 );
@@ -59,11 +59,11 @@ const TabButton = ({ value, label, activeTab, onClick, icon: Icon }) => (
 const Card = ({ title, description, linkTo, btnTitle, icon: Icon, disabled, external }) => {
   const isExternal = external || (typeof linkTo === 'string' && linkTo.startsWith('http'));
   return (
-    <div className={`group relative rounded-2xl overflow-hidden bg-[#09090b] transition-all duration-500 shadow-xl shadow-black/50 border border-white/[0.06]  ${disabled ? 'opacity-50 grayscale' : 'hover:shadow-2xl hover:border-white/20'}`}>
+    <div className={`group relative rounded-3xl overflow-hidden bg-[#09090c] hover:bg-[#0d0d12] transition-all duration-500 shadow-2xl shadow-black/70 border border-white/[0.06] hover:border-white/[0.14] backdrop-blur-2xl ${disabled ? 'opacity-50 grayscale' : 'hover:shadow-2xl'}`}>
       <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-white/10 transition-all duration-700"></div>
       <div className="relative p-5 sm:p-8 flex flex-col h-full z-10">
         <div className="mb-5 sm:mb-8">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-5 sm:mb-6 bg-white/5 border border-white/5 text-white transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-md">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-5 sm:mb-6 bg-white/[0.04] border border-white/[0.08] text-white transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-md">
             <Icon
               size={24}
               strokeWidth={1.5}
@@ -77,7 +77,7 @@ const Card = ({ title, description, linkTo, btnTitle, icon: Icon, disabled, exte
             {description}
           </p>
         </div>
-        <div className="mt-auto pt-5 sm:pt-6 border-t border-white/[0.06] ">
+        <div className="mt-auto pt-5 sm:pt-6 border-t border-white/[0.06]">
           {disabled ? (
             <div className="w-full py-3.5 sm:py-4 px-5 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-bold bg-white/5 border border-white/5 text-zinc-500 cursor-not-allowed">
               <span className="uppercase tracking-widest">OFFLINE</span>
@@ -85,20 +85,22 @@ const Card = ({ title, description, linkTo, btnTitle, icon: Icon, disabled, exte
           ) : isExternal ? (
             <a
               href={linkTo}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-3.5 sm:py-4 px-5 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-bold transition-all duration-300 bg-white/5 border border-white/5 text-white hover:bg-white hover:text-black hover:border-white/5">
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.replace(linkTo);
+              }}
+              className="w-full py-3.5 sm:py-4 px-5 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-semibold transition-all duration-300 bg-white/[0.04] border border-white/[0.08] text-zinc-200 hover:bg-white/[0.12] hover:text-white hover:border-white/20 cursor-pointer">
               <span className="uppercase tracking-widest">{btnTitle}</span>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-black/20 transform group-hover:translate-x-1 transition-all duration-300">
-                <ExternalLink size={14} className="sm:w-[16px] sm:h-[16px]" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-black/40 transform group-hover:translate-x-1 transition-all duration-300">
+                <ArrowRight size={14} className="sm:w-[16px] sm:h-[16px]" />
               </div>
             </a>
           ) : (
             <Link
               to={linkTo}
-              className="w-full py-3.5 sm:py-4 px-5 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-bold transition-all duration-300 bg-white/5 border border-white/5 text-white hover:bg-white hover:text-black hover:border-white/5">
+              className="w-full py-3.5 sm:py-4 px-5 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-semibold transition-all duration-300 bg-white/[0.04] border border-white/[0.08] text-zinc-200 hover:bg-white/[0.12] hover:text-white hover:border-white/20">
               <span className="uppercase tracking-widest">{btnTitle}</span>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-black/20 transform group-hover:translate-x-1 transition-all duration-300">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-black/40 transform group-hover:translate-x-1 transition-all duration-300">
                 <ArrowRight size={14} className="sm:w-[16px] sm:h-[16px]" />
               </div>
             </Link>
@@ -111,16 +113,16 @@ const Card = ({ title, description, linkTo, btnTitle, icon: Icon, disabled, exte
 
 const StatBox = ({ label, value, icon: Icon, color, className = "" }) => (
   <div
-    className={`bg-[#09090b] border border-white/[0.06]  rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4 relative overflow-hidden shadow-lg ${className}`}>
+    className={`bg-[#09090c] hover:bg-[#0d0d12] border border-white/[0.06] hover:border-white/[0.12] rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4 relative overflow-hidden shadow-xl backdrop-blur-xl transition-all ${className}`}>
     <div
-      className={`w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-2xl sm:rounded-2xl flex items-center justify-center bg-white/5 border border-white/5 ${color} shadow-sm`}>
+      className={`w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-2xl flex items-center justify-center bg-white/[0.04] border border-white/[0.06] ${color} shadow-sm`}>
       <Icon size={18} strokeWidth={2} className="w-4 h-4 sm:w-5 sm:h-5" />
     </div>
     <div className="min-w-0 flex-1">
-      <div className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+      <div className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">
         {typeof value === "number" ? <AnimatedNumber value={value} /> : value}
       </div>
-      <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
+      <div className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-zinc-400 truncate mt-0.5">
         {label}
       </div>
     </div>
@@ -140,7 +142,7 @@ const MasterDashboard = () => {
   const [newUser, setNewUser] = useState({
     full_name: "",
     index_number: "",
-    role: "admin",
+    role: "",
   });
 
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
@@ -186,11 +188,11 @@ const MasterDashboard = () => {
           Access Denied
         </h2>
         <p className="text-zinc-400 text-sm max-w-sm">
-          You do not have the required clearance level to access this terminal.
+          You do not have permission to access this page.
         </p>
         <Link
           to={getDefaultDashboardPath(user?.role, adminPath)}
-          className="mt-8 px-8 py-3.5 bg-white text-black hover:bg-zinc-200 font-semibold rounded-full transition-all shadow-md hover:shadow-lg">
+          className="mt-8 px-8 py-3.5 bg-white/10 hover:bg-white/15 text-white border border-white/20 font-semibold rounded-full transition-all backdrop-blur-md shadow-lg hover:border-white/30 active:scale-[0.98]">
           Return Home
         </Link>
       </div>
@@ -220,16 +222,21 @@ const MasterDashboard = () => {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!newUser.full_name || !newUser.index_number) return;
+    if (
+      !newUser.full_name?.trim() ||
+      !newUser.index_number?.trim() ||
+      !newUser.role?.trim()
+    )
+      return;
 
     try {
-      const formattedRole = formatStoredRole(newUser.role || "admin");
+      const formattedRole = formatStoredRole(newUser.role);
       const { data, error } = await supabase
         .from("users")
         .insert([
           {
-            full_name: newUser.full_name,
-            index_number: newUser.index_number,
+            full_name: newUser.full_name.trim(),
+            index_number: newUser.index_number.trim(),
             role: formattedRole,
             is_active: true,
           },
@@ -239,11 +246,11 @@ const MasterDashboard = () => {
       if (error) throw error;
 
       setUsers((prev) => [data[0], ...prev]);
-      setNewUser({ full_name: "", index_number: "", role: "admin" });
+      setNewUser({ full_name: "", index_number: "", role: "" });
       setIsAddUserModalOpen(false);
       fetchUsers();
     } catch (error) {
-      alert(`Failed to add user: ${error.message}`);
+      alert(`Failed to create user: ${error.message}`);
     }
   };
 
@@ -368,13 +375,15 @@ const MasterDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] w-full text-zinc-100 font-sans relative">
-      <div className="w-full max-w-6xl mx-auto px-6 sm:px-8 lg:px-12 py-10 sm:py-12 space-y-8 sm:space-y-10 animate-fade-in pb-32">
+    <div className="min-h-screen bg-[#060608] w-full text-zinc-100 font-sans relative overflow-hidden">
+      {/* Soft Top Ambient Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[420px] bg-gradient-to-b from-white/[0.03] to-transparent pointer-events-none blur-3xl" />
+      <div className="w-full max-w-6xl mx-auto px-6 sm:px-8 lg:px-12 py-10 sm:py-12 space-y-8 sm:space-y-10 animate-fade-in pb-32 relative z-10">
         {/* Modern Airy Header */}
         <div className="flex items-start justify-between">
           <div className="flex flex-col gap-1 sm:gap-2">
             <div className="flex items-center gap-2 mb-2" onClick={() => setDevClicks((c) => c + 1)}>
-              <ShieldCheck size={16} className="text-white" />
+              <ShieldCheck size={16} className="text-green-400" />
               <span className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-400 font-bold select-none cursor-default">
                 ICMU Portal
               </span>
@@ -382,27 +391,27 @@ const MasterDashboard = () => {
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tight text-white leading-[1.1]">
               Welcome, <br className="sm:hidden" />
               <span className="text-white font-bold">
-                {user?.name?.split(" ")[0] || (isSuper ? "Admin" : "Operator")}
+                {user?.name?.split(" ")[0] || (isSuper ? "Admin" : "User")}
               </span>
             </h2>
-            <p className="text-zinc-500 font-medium text-sm sm:text-base max-w-sm mt-2">
+            <p className="text-zinc-400 font-medium text-sm sm:text-base max-w-sm mt-2">
               {isSuper
-                ? "Manage the global state and security architecture."
-                : "Dual clearance operations hub. Select a terminal to begin."}
+                ? "Manage users, site content, and permissions."
+                : "Welcome to the portal. Select a dashboard to get started."}
             </p>
           </div>
 
           <button
             onClick={handleLogout}
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-zinc-950 border border-white/5 flex items-center justify-center text-red-600 hover:bg-red-600/10 hover:border-red-600/50 transition-all shadow-lg shrink-0"
-            title="Terminate Session">
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-zinc-950/80 border border-white/[0.08] flex items-center justify-center text-red-500 hover:bg-red-600/10 hover:border-red-500/40 transition-all shadow-lg shrink-0 cursor-pointer"
+            title="Sign Out">
             <LogOut size={20} className="sm:w-[22px] sm:h-[22px]" />
           </button>
         </div>
 
         {/* Dynamic Tabs (Pill style) - Only for Super Admin */}
         {isSuper && (
-          <div className="flex bg-zinc-950 p-1.5 rounded-2xl border border-white/[0.06] shadow-inner w-full sm:w-fit overflow-x-auto no-scrollbar gap-1">
+          <div className="flex bg-[#09090c] p-1.5 rounded-2xl border border-white/[0.06] shadow-lg backdrop-blur-xl w-full sm:w-fit overflow-x-auto no-scrollbar gap-1">
             <TabButton
               value="overview"
               icon={LayoutDashboard}
@@ -413,21 +422,21 @@ const MasterDashboard = () => {
             <TabButton
               value="users"
               icon={Users}
-              label="Access Control"
+              label="Users & Access"
               activeTab={activeTab}
               onClick={setActiveTab}
             />
             <TabButton
               value="docs"
               icon={BookOpen}
-              label="Architecture & Docs"
+              label="Documentation"
               activeTab={activeTab}
               onClick={setActiveTab}
             />
             <TabButton
               value="storage"
               icon={Database}
-              label="Storage Manager"
+              label="Database & Storage"
               activeTab={activeTab}
               onClick={setActiveTab}
             />
@@ -436,7 +445,7 @@ const MasterDashboard = () => {
 
         {/* --- CONTENT AREA --- */}
 
-        {/* 1. OVERVIEW VIEW - Always visible for Dual Clearance operators, or when activeTab is overview */}
+        {/* 1. OVERVIEW VIEW - Always visible for Dual Role users, or when activeTab is overview */}
         {(!isSuper || activeTab === "overview") && (
           <div className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
@@ -449,10 +458,10 @@ const MasterDashboard = () => {
               />
               <Card
                 title="Broadcasting Admin"
-                description="Live Broadcasting operations terminal, telemetry, and stream infrastructure."
+                description="Live stream dashboard, broadcast controls, and stream status."
                 icon={ScanLine}
                 linkTo={getBroadcasterAdminUrl(adminPath || user?.indexNumber, user)}
-                btnTitle="Launch Protocol"
+                btnTitle="Launch Broadcaster"
                 disabled={false}
                 external={true}
               />
@@ -466,7 +475,7 @@ const MasterDashboard = () => {
             {/* Quick Stats iOS style */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               <StatBox
-                label="Total Identities"
+                label="Total Users"
                 value={totalUsers || "-"}
                 icon={Users}
                 color="text-white"
@@ -478,7 +487,7 @@ const MasterDashboard = () => {
                 color="text-cyan-400"
               />
               <StatBox
-                label="Local Auth"
+                label="Password Users"
                 value={localAuthCount || "-"}
                 icon={Key}
                 color="text-amber-400"
@@ -487,30 +496,31 @@ const MasterDashboard = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 p-1 sm:p-2 mb-2">
-              <div className="px-2">
-                <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                  Security Matrix
+              <div className="px-1">
+                <h3 className="text-lg sm:text-xl font-bold text-zinc-100 tracking-tight flex items-center gap-2">
+                  <span>User Management</span>
+                  <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.7)]" />
                 </h3>
               </div>
               <div className="flex items-center justify-between w-full sm:w-auto gap-2 sm:gap-3">
-                <div className="hidden sm:flex bg-zinc-900 p-1 rounded-2xl border border-white/[0.06] ">
+                <div className="hidden sm:flex bg-[#09090c] p-1 rounded-2xl border border-white/[0.06] backdrop-blur-md">
                   <button
                     onClick={() => setViewMode("list")}
-                    className={`p-2.5 rounded-2xl transition-all ${
+                    className={`p-2 rounded-xl transition-all cursor-pointer ${
                       viewMode === "list"
-                        ? "bg-white text-black shadow-sm"
-                        : "text-zinc-500 hover:text-white"
+                        ? "bg-white/[0.14] text-white border border-white/20 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-300"
                     }`}>
-                    <List size={18} />
+                    <List size={16} />
                   </button>
                   <button
                     onClick={() => setViewMode("card")}
-                    className={`p-2.5 rounded-2xl transition-all ${
+                    className={`p-2 rounded-xl transition-all cursor-pointer ${
                       viewMode === "card"
-                        ? "bg-white text-black shadow-sm"
-                        : "text-zinc-500 hover:text-white"
+                        ? "bg-white/[0.14] text-white border border-white/20 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-300"
                     }`}>
-                    <LayoutGrid size={18} />
+                    <LayoutGrid size={16} />
                   </button>
                 </div>
 
@@ -518,23 +528,26 @@ const MasterDashboard = () => {
                   <button
                     onClick={() => {
                       fetchUsers();
-                      toast.success("Identity records refreshed");
+                      toast.success("User list refreshed");
                     }}
-                    className="p-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-2xl border border-white/[0.06] transition-all cursor-pointer"
+                    className="p-2.5 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl border border-white/[0.08] transition-all cursor-pointer"
                     title="Refresh data">
-                    <RefreshCw size={16} className={isLoadingUsers ? "animate-spin text-white" : ""} />
+                    <RefreshCw size={15} className={isLoadingUsers ? "animate-spin text-green-400" : ""} />
                   </button>
                   <button
                     onClick={() => setIsRoleGuideModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-2xl border border-white/[0.08] text-xs font-bold transition-all cursor-pointer shadow-sm"
-                    title="View Role Guidelines & Clearance Matrix">
-                    <BookOpen size={15} className="text-cyan-400" />
+                    className="flex items-center gap-1.5 px-3 py-2.5 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl border border-white/[0.08] text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                    title="View Role Guidelines">
+                    <BookOpen size={14} className="text-cyan-400" />
                     <span className="hidden sm:inline">Guidelines</span>
                   </button>
                   <button
-                    onClick={() => setIsAddUserModalOpen(true)}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-zinc-200 rounded-2xl text-sm font-bold transition-all shadow-md hover:shadow-lg cursor-pointer">
-                    <Plus size={18} strokeWidth={2.5} /> New Identity
+                    onClick={() => {
+                      setNewUser({ full_name: "", index_number: "", role: "" });
+                      setIsAddUserModalOpen(true);
+                    }}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-green-500/15 hover:bg-green-500/25 text-green-400 border border-green-500/30 hover:border-green-500/50 rounded-xl text-xs sm:text-sm font-semibold tracking-wide uppercase transition-all shadow-[0_0_20px_rgba(34,197,94,0.12)] hover:shadow-[0_0_25px_rgba(34,197,94,0.25)] hover:scale-[1.02] active:scale-95 cursor-pointer">
+                    <Plus size={16} strokeWidth={2.5} /> Create User
                   </button>
                 </div>
               </div>
@@ -544,7 +557,7 @@ const MasterDashboard = () => {
               <div className="rounded-2xl border border-white/[0.06]  bg-zinc-950 min-h-[300px] flex flex-col items-center justify-center gap-4 shadow-xl">
                 <Activity size={32} className="text-white animate-pulse" />
                 <span className="text-xs text-zinc-500 uppercase tracking-widest font-bold">
-                  Decrypting identities...
+                  Loading users...
                 </span>
               </div>
             ) : (

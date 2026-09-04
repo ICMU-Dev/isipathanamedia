@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
-import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
+import ReactCrop, { centerCrop, makeAspectCrop, convertToPixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
-import { X, Crop, Check } from "lucide-react";
+import { X, Crop, Check, Loader2 } from "lucide-react";
 
 const ASPECT_RATIO = 16 / 9;
 
@@ -31,6 +31,7 @@ const ImageCropperModal = ({
 }) => {
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const imgRef = useRef(null);
 
   if (!isOpen || !imageSrc) return null;
@@ -44,58 +45,81 @@ const ImageCropperModal = ({
 
   const onImageLoad = (e) => {
     const { width, height } = e.currentTarget;
-    setCrop(centerAspectCrop(width, height, currentRatio));
+    const initialCrop = centerAspectCrop(width, height, currentRatio);
+    setCrop(initialCrop);
+    setCompletedCrop(convertToPixelCrop(initialCrop, width, height));
   };
 
   const generateCroppedImage = async () => {
-    if (!completedCrop || !imgRef.current) return;
-
     const image = imgRef.current;
+    if (!image) return null;
+
+    let targetCrop = completedCrop;
+    if (!targetCrop && crop) {
+      targetCrop = convertToPixelCrop(crop, image.width, image.height);
+    }
+    if (!targetCrop || !targetCrop.width || !targetCrop.height) {
+      const initial = centerAspectCrop(image.width, image.height, currentRatio);
+      targetCrop = convertToPixelCrop(initial, image.width, image.height);
+    }
+    if (!targetCrop || !targetCrop.width || !targetCrop.height) return null;
+
     const canvas = document.createElement("canvas");
     const scaleX = image.naturalWidth / image.width;
     const scaleY = image.naturalHeight / image.height;
 
-    canvas.width = completedCrop.width * scaleX;
-    canvas.height = completedCrop.height * scaleY;
+    canvas.width = targetCrop.width * scaleX;
+    canvas.height = targetCrop.height * scaleY;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) return null;
 
     ctx.drawImage(
       image,
-      completedCrop.x * scaleX,
-      completedCrop.y * scaleY,
-      completedCrop.width * scaleX,
-      completedCrop.height * scaleY,
+      targetCrop.x * scaleX,
+      targetCrop.y * scaleY,
+      targetCrop.width * scaleX,
+      targetCrop.height * scaleY,
       0,
       0,
-      completedCrop.width * scaleX,
-      completedCrop.height * scaleY,
+      targetCrop.width * scaleX,
+      targetCrop.height * scaleY,
     );
 
     return new Promise((resolve) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            console.error("Canvas is empty");
-            return;
-          }
-          blob.name = "cropped.jpeg";
-          const file = new File([blob], "cropped-cover.jpeg", {
-            type: "image/jpeg",
-          });
-          resolve(file);
-        },
-        "image/jpeg",
-        0.95,
-      );
+      try {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              console.error("Canvas is empty");
+              resolve(null);
+              return;
+            }
+            blob.name = "cropped.jpeg";
+            const file = new File([blob], "cropped-cover.jpeg", {
+              type: "image/jpeg",
+            });
+            resolve(file);
+          },
+          "image/jpeg",
+          0.95,
+        );
+      } catch (err) {
+        console.error("Failed to crop image blob:", err);
+        resolve(null);
+      }
     });
   };
 
   const handleSave = async () => {
-    const croppedFile = await generateCroppedImage();
-    if (croppedFile) {
-      onCropComplete(croppedFile);
+    setIsProcessing(true);
+    try {
+      const croppedFile = await generateCroppedImage();
+      if (croppedFile) {
+        onCropComplete(croppedFile);
+      }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -147,8 +171,17 @@ const ImageCropperModal = ({
           </button>
           <button
             onClick={handleSave}
-            className="px-8 py-3 rounded-2xl bg-theme-accent text-black hover:bg-[#00cc00] shadow-[0_0_15px_rgba(0,255,0,0.2)] text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2">
-            <Check size={16} /> Apply Crop
+            disabled={isProcessing}
+            className="px-8 py-3 rounded-2xl bg-theme-accent text-black hover:bg-[#00cc00] shadow-[0_0_15px_rgba(0,255,0,0.2)] text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            {isProcessing ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Cropping...
+              </>
+            ) : (
+              <>
+                <Check size={16} /> Apply Crop
+              </>
+            )}
           </button>
         </div>
       </div>

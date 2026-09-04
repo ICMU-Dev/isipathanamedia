@@ -10,6 +10,7 @@ import {
   Radio,
   GripHorizontal,
   X,
+  Download,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
@@ -25,6 +26,7 @@ import {
   canAccessBroadcastDashboard,
   getBroadcasterAdminUrl,
 } from "../../utils/roles";
+import { usePWAInstall } from "../../hooks/usePWAInstall";
 
 const BottomNavbar = () => {
   const location = useLocation();
@@ -65,9 +67,7 @@ const BottomNavbar = () => {
   const unreadMessages =
     notifications?.filter((n) => !n.isFeedback && !n.read).length || 0;
 
-  const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true;
+  const { isStandalone, isInstallable, promptInstall } = usePWAInstall();
   const showSettingsBadge = isAdm && unreadFeedbacks > 0;
   // Auto-clear message notifications when visiting the Chat tab
   useEffect(() => {
@@ -399,35 +399,44 @@ const BottomNavbar = () => {
         style={{ backgroundColor: "color-mix(in srgb, var(--admin-card-bg) 95%, transparent)" }}>
         {showMore === true ? (
           <div>
-            <div className="grid grid-cols-3 gap-2 min-w-[80%] relative z-10">
-              {overflowItems.map((item) => {
-                const isExternal = item.external || (typeof item.path === 'string' && item.path.startsWith('http'));
+            <div className="grid grid-cols-2 gap-2.5 min-w-[240px] relative z-10">
+              {overflowItems.map((item, index) => {
+                const isExternal =
+                  item.external ||
+                  (typeof item.path === "string" && item.path.startsWith("http"));
                 const content = (
                   <>
-                    <div className="relative">
+                    <div className="relative mb-1">
                       {item.icon}
                       {item.hasNotification && (
                         <span className="absolute -top-1 -right-1 w-2 h-2 bg-theme-accent rounded-full border border-black shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
                       )}
                     </div>
-                    <span className="text-[10px] font-semibold text-center mt-1">
+                    <span className="text-[11px] font-semibold text-center mt-0.5 truncate w-full px-1">
                       {item.name}
                     </span>
                   </>
                 );
 
-                const itemClass = "flex flex-col items-center justify-center p-3 rounded-2xl bg-black/50 border border-white/[0.06] hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white relative overflow-hidden group";
+                const isSingleOrLastOdd =
+                  overflowItems.length % 2 !== 0 &&
+                  index === overflowItems.length - 1;
+                const itemClass = `flex flex-col items-center justify-center p-3.5 rounded-2xl bg-black/50 border border-white/[0.08] hover:bg-white/10 active:scale-95 transition-all text-white/80 hover:text-white relative overflow-hidden group cursor-pointer ${
+                  isSingleOrLastOdd ? "col-span-2" : ""
+                }`;
 
                 if (isExternal) {
                   return (
                     <a
                       key={item.path}
                       href={item.path}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       draggable="false"
                       style={{ WebkitUserDrag: "none" }}
-                      onClick={() => setShowMore(false)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowMore(false);
+                        window.location.replace(item.path);
+                      }}
                       className={itemClass}>
                       {content}
                     </a>
@@ -447,6 +456,8 @@ const BottomNavbar = () => {
                 );
               })}
             </div>
+
+         
           </div>
         ) : null}
       </MorphingModal>

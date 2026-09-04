@@ -201,5 +201,6 @@ export const AVAILABLE_ROLE_OPTIONS = [
   { value: 'super-admin', label: 'Super Admin', description: 'Full access to all terminals and user clearance matrix' },
 ];
 
+export { isSuperAdmin as isSuper };
 export { BROADCASTER_BASE_URL, getBroadcasterAdminUrl, getBroadcasterBaseUrl } from './broadcasterSso';
 

@@ -1,0 +1,202 @@
+{
+  "nodes": [
+    {
+      "id": "changelog_ga4_admin_analytics_integration",
+      "label": "GA4 Admin Analytics Integration",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\CHANGELOG.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_instagram_style_news_feed",
+      "label": "Instagram-Style News Feed",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\CHANGELOG.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "changelog_mpmu_nethinethera_modules",
+      "label": "MPMU & Nethinethera Modules",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\CHANGELOG.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "readme_isipathana_college_media_unit",
+      "label": "Isipathana College Media Unit",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "readme_analytics_integration",
+      "label": "Analytics Integration",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "readme_public_news_feed",
+      "label": "Public News Feed",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "index_nethinethera",
+      "label": "Nethinethera",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "index_sandhwani",
+      "label": "Sandhwani",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "newsroom_overhaul_newsroom_overhaul",
+      "label": "Newsroom Overhaul",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\newsroom-overhaul.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "newsroom_overhaul_submitted_by_uuid",
+      "label": "submitted_by UUID Migration",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\newsroom-overhaul.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "newsroom_overhaul_draft_isolation",
+      "label": "Draft Isolation",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\newsroom-overhaul.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "newsroom_overhaul_needs_attention_workflow",
+      "label": "Needs Attention Workflow",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\newsroom-overhaul.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_robots_admin_routes",
+      "label": "Admin Routes",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\public\\robots.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "changelog_ga4_admin_analytics_integration",
+      "target": "readme_analytics_integration",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\CHANGELOG.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_instagram_style_news_feed",
+      "target": "readme_public_news_feed",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\CHANGELOG.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "changelog_mpmu_nethinethera_modules",
+      "target": "index_nethinethera",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\CHANGELOG.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "newsroom_overhaul_submitted_by_uuid",
+      "target": "newsroom_overhaul_newsroom_overhaul",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\newsroom-overhaul.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "newsroom_overhaul_draft_isolation",
+      "target": "newsroom_overhaul_newsroom_overhaul",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\User\\Documents\\DEV PROJECTS\\icmu-web\\newsroom-overhaul.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

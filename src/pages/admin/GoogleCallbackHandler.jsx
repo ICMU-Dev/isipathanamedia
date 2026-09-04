@@ -72,7 +72,10 @@ const GoogleCallbackHandler = () => {
       try {
         const supaUser = session.user;
         const googleEmail = supaUser.email || "";
-        const googlePicture = supaUser.user_metadata?.avatar_url || "";
+        const googlePicture =
+          supaUser.user_metadata?.avatar_url ||
+          supaUser.user_metadata?.picture ||
+          "";
 
         const action = localStorage.getItem("icmu_auth_action");
 

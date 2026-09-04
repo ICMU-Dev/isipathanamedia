@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import ImageCropperModal from "../../components/admin/ImageCropperModal";
 import MediaLibrary from "../../components/admin/MediaLibrary";
+import DiscardChangesModal from "../../components/admin/DiscardChangesModal";
 import { useUpdateForm } from "../../hooks/admin/useUpdateForm";
 import { MorphingModal } from "../../components/motion/morphing-modal";
 import UpdateMediaSection from "../../components/admin/update-form/UpdateMediaSection";
@@ -24,6 +25,7 @@ const CreateUpdate = () => {
     canEditMetadata,
     formData,
     setFormData,
+    isDirty,
     link,
     setLink,
     extracting,
@@ -42,6 +44,37 @@ const CreateUpdate = () => {
 
   const [step, setStep] = useState("link"); // 'link' | 'media' | 'form'
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+
+  // Determine if the update is half-written or has unsaved edits
+  const isHalfWritten = isEditing
+    ? isDirty
+    : isDirty ||
+      Boolean(
+        link?.trim() ||
+        formData.title?.trim() ||
+        formData.content?.trim() ||
+        formData.image
+      );
+
+  const handleRequestClose = () => {
+    if (isHalfWritten) {
+      setShowDiscardModal(true);
+    } else {
+      navigate(-1);
+    }
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isHalfWritten) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isHalfWritten]);
 
   // Default to form if editing existing post
   useEffect(() => {
@@ -66,7 +99,7 @@ const CreateUpdate = () => {
 
       <MorphingModal
         viewId={step}
-        onClose={() => navigate(-1)}
+        onClose={handleRequestClose}
         className="sm:max-w-[500px]">
         <div className="w-full bg-[var(--admin-card-bg)] flex flex-col min-h-[450px] max-h-[85vh] overflow-hidden relative rounded-3xl border border-white/5 p-2 shadow-2xl">
           {step === "link" && (
@@ -76,8 +109,8 @@ const CreateUpdate = () => {
                   <LinkIcon size={16} className="text-white/40" /> Step 1: Link
                 </h3>
                 <button
-                  onClick={() => navigate(-1)}
-                  className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors">
+                  onClick={handleRequestClose}
+                  className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                   <X size={14} />
                 </button>
               </div>
@@ -142,8 +175,8 @@ const CreateUpdate = () => {
                   </h3>
                 </div>
                 <button
-                  onClick={() => navigate(-1)}
-                  className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors">
+                  onClick={handleRequestClose}
+                  className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                   <X size={14} />
                 </button>
               </div>
@@ -187,8 +220,8 @@ const CreateUpdate = () => {
                   </h3>
                 </div>
                 <button
-                  onClick={() => navigate(-1)}
-                  className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors">
+                  onClick={handleRequestClose}
+                  className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                   <X size={14} />
                 </button>
               </div>
@@ -206,6 +239,7 @@ const CreateUpdate = () => {
                   extractData={extractData}
                   handleSave={handleSave}
                   navigate={navigate}
+                  onCancel={handleRequestClose}
                 />
               </div>
             </div>
@@ -231,6 +265,17 @@ const CreateUpdate = () => {
         onCropComplete={handleCropComplete}
         aspectRatio={3 / 4}
         aspectRatioLabel="3:4 Portrait Ratio (Quick Update)"
+      />
+
+      <DiscardChangesModal
+        isOpen={showDiscardModal}
+        onDiscard={() => {
+          setShowDiscardModal(false);
+          navigate(-1);
+        }}
+        onKeepEditing={() => setShowDiscardModal(false)}
+        title="Discard Update?"
+        description="Your update is currently in progress. If you leave now, your unsaved changes will be lost."
       />
     </div>
   );

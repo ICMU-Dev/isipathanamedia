@@ -13,6 +13,8 @@ import {
   Undo,
   Redo,
   ImagePlus,
+  Link2,
+  Unlink,
 } from "lucide-react";
 
 const MenuBar = ({ editor, onInsertImage }) => {
@@ -113,6 +115,20 @@ const MenuBar = ({ editor, onInsertImage }) => {
         icon={Code}
         title="Code"
       />
+      <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
+      <Btn
+        onClick={setLink}
+        isActive={editor?.isActive("link")}
+        icon={Link2}
+        title={editor?.isActive("link") ? "Edit Link" : "Insert Link"}
+      />
+      {editor?.isActive("link") && (
+        <Btn
+          onClick={() => editor?.chain().focus().unsetLink().run()}
+          icon={Unlink}
+          title="Remove Link"
+        />
+      )}
       <Btn onClick={onInsertImage} icon={ImagePlus} title="Insert Image" />
       <div className="flex-1" />
       <Btn

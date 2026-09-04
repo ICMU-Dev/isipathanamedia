@@ -205,7 +205,7 @@ const ArticleViewer = () => {
     });
     
     return () => { active = false; };
-  }, [id, fetchNews, fetchWebUsers, fetchArticleById]);
+  }, [id, user, fetchNews, fetchWebUsers, fetchArticleById]);
 
   useEffect(() => {
     if (fetchComplete) {
@@ -261,7 +261,7 @@ const ArticleViewer = () => {
           Article Not Found
         </h1>
         <p className="text-white/40 mb-10 max-w-md text-sm leading-relaxed">
-          The requested article has been moved, deleted, or is private. If this is a private article, please log in as an administrator to view it.
+          The requested article has been moved, deleted, or restricted. Private and unlisted articles are only accessible to their author or administrators.
         </p>
         <div className="flex gap-4">
           <button

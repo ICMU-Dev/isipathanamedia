@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Save,
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import MediaLibrary from "../../components/admin/MediaLibrary";
 import ImageCropperModal from "../../components/admin/ImageCropperModal";
+import DiscardChangesModal from "../../components/admin/DiscardChangesModal";
 import { useArticleForm } from "../../hooks/admin/useArticleForm";
 import { MorphingModal } from "../../components/motion/morphing-modal";
 import TagInput from "../../components/admin/article-wizard/TagInput";
@@ -42,6 +43,7 @@ const CreateArticle = () => {
     setIsAnonymous,
     canEditMetadata,
     isEditing,
+    isDirty,
     cropModalOpen,
     setCropModalOpen,
     imageToCrop,
@@ -57,6 +59,46 @@ const CreateArticle = () => {
     setCurrentStep,
   } = form;
 
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+
+  // Check if article content has been written
+  const isContentWritten = Boolean(
+    formData.content &&
+    formData.content !== "<p></p>" &&
+    formData.content.replace(/<[^>]*>?/gm, "").trim().length > 0
+  );
+
+  // Determine if the article is half-written or has unsaved edits
+  const isHalfWritten = isEditing
+    ? isDirty
+    : isDirty ||
+      Boolean(
+        formData.title?.trim() ||
+        formData.category?.trim() ||
+        isContentWritten ||
+        formData.image ||
+        (formData.tags && formData.tags.length > 0)
+      );
+
+  const handleRequestClose = () => {
+    if (isHalfWritten) {
+      setShowDiscardModal(true);
+    } else {
+      navigate(-1);
+    }
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isHalfWritten) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isHalfWritten]);
+
   const viewId = `step-${currentStep}`;
 
   return (
@@ -66,7 +108,7 @@ const CreateArticle = () => {
 
       <MorphingModal
         viewId={viewId}
-        onClose={() => navigate(-1)}
+        onClose={handleRequestClose}
         className="sm:max-w-[720px]">
         <div className="w-full bg-[var(--admin-card-bg)]   flex flex-col min-h-[400px] max-h-[95vh] overflow-hidden relative rounded-3xl  border border-white/5 shadow-2xl">
           <div className="flex justify-between items-center p-3 pb-2 border-b border-white/[0.06]">
@@ -74,8 +116,8 @@ const CreateArticle = () => {
                {isEditing ? "Edit Article" : "Write Article"}
              </h3>
              <button
-               onClick={() => navigate(-1)}
-               className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors">
+               onClick={handleRequestClose}
+               className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                <X size={14} />
              </button>
           </div>
@@ -88,9 +130,14 @@ const CreateArticle = () => {
             <div className="flex flex-col h-full flex-1 min-h-0">
               <div className="flex-1 overflow-y-auto hide-scrollbar p-3 space-y-6">
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-bold text-theme-primary opacity-50 uppercase tracking-widest ml-1">
-                    Title *
-                  </label>
+                  <div className="flex items-center justify-between ml-1">
+                    <label className="block text-[10px] font-bold text-theme-primary opacity-50 uppercase tracking-widest">
+                      Title *
+                    </label>
+                    <span className="text-[10px] font-mono text-theme-primary opacity-40">
+                      {formData.title.length}/100
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={formData.title}
@@ -109,16 +156,18 @@ const CreateArticle = () => {
                       {errors.title}
                     </p>
                   )}
-                  <p className="text-right text-[10px] text-theme-primary opacity-40">
-                    {formData.title.length}/100
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="block text-[10px] font-bold text-theme-primary opacity-50 uppercase tracking-widest ml-1">
-                      Category *
-                    </label>
+                    <div className="flex items-center justify-between ml-1">
+                      <label className="block text-[10px] font-bold text-theme-primary opacity-50 uppercase tracking-widest">
+                        Category *
+                      </label>
+                      <span className="text-[10px] font-mono text-theme-primary opacity-40">
+                        {formData.category.length}/40
+                      </span>
+                    </div>
                     <input
                       type="text"
                       value={formData.category}
@@ -137,9 +186,6 @@ const CreateArticle = () => {
                         {errors.category}
                       </p>
                     )}
-                    <p className="text-right text-[10px] text-theme-primary opacity-40">
-                      {formData.category.length}/40
-                    </p>
                   </div>
                   <div className="space-y-2">
                     <label className="block text-[10px] font-bold text-theme-primary opacity-50 uppercase tracking-widest ml-1">
@@ -448,6 +494,17 @@ const CreateArticle = () => {
         onCropComplete={handleCropComplete}
         aspectRatio={16 / 9}
         aspectRatioLabel="16:9 Widescreen Ratio (Article)"
+      />
+
+      <DiscardChangesModal
+        isOpen={showDiscardModal}
+        onDiscard={() => {
+          setShowDiscardModal(false);
+          navigate(-1);
+        }}
+        onKeepEditing={() => setShowDiscardModal(false)}
+        title="Discard Article?"
+        description="Your article is currently in progress. If you leave now, your unsaved changes will be lost."
       />
     </div>
   );

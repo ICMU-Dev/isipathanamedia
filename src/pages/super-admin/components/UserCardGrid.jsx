@@ -1,17 +1,20 @@
-import React from "react";
+import React, { useState } from "react";
 import {
-  Globe,
-  ShieldOff,
   Key,
   Shield,
-  MoreVertical,
-  Edit2,
-  PowerOff,
-  Trash2,
+  ShieldAlert,
+  Radio,
+  PenTool,
+  MoreHorizontal,
   Clock,
+  CheckCircle2,
+  Globe,
+  ShieldOff,
+  Lock,
 } from "lucide-react";
-import { AnimatedBadge } from "../../../components/motion/animated-badge";
-import RoleMenuDropdown from "./RoleMenuDropdown";
+import ClearanceModal from "./ClearanceModal";
+import UserActionsModal from "./UserActionsModal";
+import { getRoleLabel, isSuperAdmin } from "../../../utils/roles";
 
 const formatLastSeen = (timestamp) => {
   if (!timestamp) return "Never";
@@ -36,7 +39,6 @@ const formatLastSeen = (timestamp) => {
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
   });
 };
 
@@ -52,196 +54,211 @@ const getLatestSessionTime = (user) => {
   return new Date(Math.max(...times)).toISOString();
 };
 
+const getRoleIcon = (roleStr) => {
+  if (isSuperAdmin(roleStr)) return ShieldAlert;
+  if (roleStr?.includes("broadcaster") && !roleStr?.includes("admin"))
+    return Radio;
+  if (roleStr?.includes("writer")) return PenTool;
+  return Shield;
+};
+
 const UserCardGrid = ({
   users,
   viewMode,
-  openMenuId,
-  setOpenMenuId,
   onEditUser,
   onResetPassword,
   onToggleActive,
   onDeleteUser,
   onRoleChange,
 }) => {
+  const [selectedClearanceUser, setSelectedClearanceUser] = useState(null);
+  const [selectedActionUser, setSelectedActionUser] = useState(null);
+
   return (
-    <div
-      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 ${
-        viewMode === "list" ? "block sm:hidden" : "block"
-      }`}>
-      {users.map((u) => (
-        <div
-          key={u.id}
-          className="rounded-3xl bg-[#09090b] hover:bg-[#0c0c0e] border border-white/[0.08] hover:border-white/20 transition-all duration-300 flex flex-col justify-between overflow-visible relative group shadow-xl hover:shadow-2xl">
-          {/* Card Top Section: Avatar, Identity, Badges, 3-dots */}
-          <div className="p-5 sm:p-6 flex items-start gap-3.5 sm:gap-4 relative z-10">
-            {/* Avatar */}
-            <div className="relative shrink-0">
-              <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-lg font-bold text-white overflow-hidden shadow-inner relative">
-                <span className="flex items-center justify-center w-full h-full text-zinc-300 font-semibold select-none">
-                  {u.full_name?.charAt(0)}
-                </span>
-                {u.avatar_url && (
-                  <img
-                    src={u.avatar_url}
-                    alt={u.full_name}
-                    className="w-full h-full object-cover absolute inset-0 z-10"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                )}
-              </div>
-              {u.is_active !== false && (
-                <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] border-2 border-[#09090b]" />
-              )}
-            </div>
+    <>
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 ${
+          viewMode === "list" ? "block sm:hidden" : "block"
+        }`}>
+        {users.map((u) => {
+          const isDevLocked =
+            u.index_number === "24929" || u.index_number === "25473";
+          const isSuper = isSuperAdmin(u.role);
+          const lastSeen = formatLastSeen(getLatestSessionTime(u));
+          const RoleIcon = getRoleIcon(u.role);
 
-            {/* Name & Identity */}
-            <div className="min-w-0 flex-1 pt-0.5">
-              <h4
-                className="font-bold text-base sm:text-[17px] text-white tracking-tight leading-snug line-clamp-2"
-                title={u.full_name}>
-                {u.full_name}
-              </h4>
-              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                <span className="font-mono text-[10px] text-zinc-400 font-medium tracking-wider bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/5">
-                  #{u.index_number}
-                </span>
-
-                {u.email ? (
-                  <AnimatedBadge
-                    status="info"
-                    size="sm"
-                    icon={<Globe size={10} />}
-                    className="uppercase tracking-widest font-bold text-[9px] py-0.5">
-                    Google SSO
-                  </AnimatedBadge>
-                ) : (
-                  <AnimatedBadge
-                    status="warning"
-                    size="sm"
-                    icon={<ShieldOff size={10} />}
-                    className="uppercase tracking-widest font-bold text-[9px] py-0.5">
-                    Local Hash
-                  </AnimatedBadge>
-                )}
-              </div>
-            </div>
-
-            {/* 3-Dots Action Menu */}
-            {u.role !== "super-admin" &&
-              u.index_number !== "24929" &&
-              u.index_number !== "25473" && (
-                <div
-                  className="relative shrink-0"
-                  onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenMenuId(openMenuId === u.id ? null : u.id);
-                    }}
-                    className="p-2 text-zinc-500 hover:text-white bg-white/[0.03] hover:bg-white/10 rounded-xl transition-all border border-white/5 hover:border-white/10 cursor-pointer">
-                    <MoreVertical size={18} />
-                  </button>
-                  {openMenuId === u.id && (
-                    <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-zinc-950 border border-white/10 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right overflow-hidden p-1.5 flex flex-col gap-1 backdrop-blur-md">
-                      <button
-                        onClick={() => {
-                          onEditUser(u);
-                          setOpenMenuId(null);
-                        }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer">
-                        <Edit2 size={14} /> Rename Protocol
-                      </button>
-                      <button
-                        onClick={() => {
-                          onResetPassword(u.id);
-                          setOpenMenuId(null);
-                        }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer">
-                        <Key size={14} /> Force Password
-                      </button>
-                      <button
-                        onClick={() => {
-                          onToggleActive(u.id, u.is_active);
-                          setOpenMenuId(null);
-                        }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 transition-colors cursor-pointer">
-                        <PowerOff size={14} />{" "}
-                        {u.is_active !== false ? "Suspend Access" : "Restore Access"}
-                      </button>
-                      <div className="h-px bg-white/10 my-1 mx-2"></div>
-                      <button
-                        onClick={() => {
-                          onDeleteUser(u.id);
-                          setOpenMenuId(null);
-                        }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-red-500 hover:bg-red-600/10 hover:text-red-400 transition-colors cursor-pointer">
-                        <Trash2 size={14} /> Terminate
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-          </div>
-
-          {/* Card Middle Section: Clearance Level Dropdown */}
-          <div className="px-5 sm:px-6 py-4 bg-black/40 border-t border-white/[0.06] flex-1 flex flex-col justify-end space-y-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-              <Shield size={11} className="text-zinc-500" />
-              <span>Clearance Level</span>
-            </div>
-
-            {u.index_number === "24929" || u.index_number === "25473" ? (
-              <div className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-white/[0.03] border border-white/10 rounded-2xl text-xs font-mono font-bold tracking-widest uppercase text-zinc-400">
-                <Key size={13} className="text-zinc-500" />
-                <span>Developer Lock</span>
-              </div>
-            ) : (
-              <RoleMenuDropdown
-                role={u.role || "admin"}
-                onSave={(newRole) => onRoleChange(u.id, newRole)}
-              />
-            )}
-          </div>
-
-          {/* Card Bottom Section: Status Pill & Last Login */}
-          <div className="px-5 sm:px-6 py-3.5 bg-black/70 border-t border-white/[0.06] flex items-center justify-between">
+          return (
             <div
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                u.is_active !== false
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                  : "bg-red-500/10 border-red-500/20 text-red-400"
-              }`}>
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  u.is_active !== false
-                    ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse"
-                    : "bg-red-500"
-                }`}
-              />
-              {u.is_active !== false ? "Active" : "Suspended"}
-            </div>
+              key={u.id}
+              className="rounded-[24px] bg-[#09090c] border border-white/[0.06] hover:border-white/[0.14] transition-all duration-300 flex flex-col justify-between relative group shadow-2xl hover:shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl p-5 overflow-hidden">
+              {/* Subtle Ambient Background Highlight */}
 
-            <span
-              className="text-[10px] text-zinc-500 font-mono tracking-wider uppercase inline-flex items-center gap-1"
-              title={
-                getLatestSessionTime(u)
-                  ? new Date(getLatestSessionTime(u)).toLocaleString()
-                  : "No entry"
-              }>
-              <Clock size={10} className="text-zinc-600 shrink-0" />
-              {formatLastSeen(getLatestSessionTime(u))}
-            </span>
+              {/* Profile Top Section - Compact & Icon-Driven */}
+              <div className="flex flex-col items-center text-center relative z-10">
+                {/* Circular Avatar with Warmer Green Online Indicator Dot */}
+                <div className="relative mx-auto mb-2.5">
+                  <div className="w-14 h-14 rounded-full bg-zinc-950 border border-white/10 ring-2 ring-black/60 flex items-center justify-center text-xl font-bold text-white overflow-hidden shadow-lg relative">
+                    <span className="flex items-center justify-center w-full h-full text-zinc-300 font-semibold select-none">
+                      {u.full_name?.charAt(0)}
+                    </span>
+                    {u.avatar_url && (
+                      <img
+                        src={u.avatar_url}
+                        alt={u.full_name}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover absolute inset-0 z-10"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
+                  </div>
+                  {/* Status Indicator Dot at Avatar Rim */}
+                  <div
+                    className={`absolute top-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#09090c] z-20 ${
+                      u.is_active !== false
+                        ? "bg-green-500"
+                        : "bg-red-500"
+                    }`}
+                    title={
+                      u.is_active !== false ? "Active" : "Suspended"
+                    }
+                  />
+                </div>
+
+                {/* Identity Name with Verified Badge */}
+                <h3
+                  className="font-bold text-base text-white tracking-tight flex items-center justify-center gap-1.5 line-clamp-1"
+                  title={u.full_name}>
+                  <span>{u.full_name}</span>
+                  <CheckCircle2
+                    size={14}
+                    className="text-sky-400 fill-sky-400/20 shrink-0"
+                  />
+                </h3>
+
+                {/* Single Role Pill Badge */}
+                <div className="mt-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/[0.04] border border-white/[0.08] text-zinc-200">
+                    <RoleIcon
+                      size={12}
+                      className={
+                        isSuper
+                          ? "text-red-400"
+                          : u.role?.includes("broadcaster") &&
+                              u.role?.includes("admin")
+                            ? "text-cyan-400"
+                            : "text-green-400"
+                      }
+                    />
+                    <span>{getRoleLabel(u.role)}</span>
+                  </div>
+                </div>
+
+                {/* Minimal Icon-Driven Metadata Strip */}
+                <div className="mt-3 flex items-center justify-center gap-2 text-xs text-zinc-400 flex-wrap">
+                  {/* User Index */}
+                  <span
+                    className="inline-flex items-center gap-1 font-mono text-[11px] text-zinc-400 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]"
+                    title={`User #${u.index_number}`}>
+                    <Key size={11} className="text-zinc-500" />
+                    <span>#{u.index_number}</span>
+                  </span>
+
+                  {/* Sign-in Method Tag */}
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] text-zinc-400 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]"
+                    title={u.email ? "Google sign-in" : "Password sign-in"}>
+                    {u.email ? (
+                      <>
+                        <Globe size={11} className="text-cyan-400 shrink-0" />
+                        <span>Google</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldOff
+                          size={11}
+                          className="text-amber-400/90 shrink-0"
+                        />
+                        <span>Password</span>
+                      </>
+                    )}
+                  </span>
+
+                  {/* Last Seen */}
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] text-zinc-400 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]"
+                    title={
+                      getLatestSessionTime(u)
+                        ? `Last active: ${new Date(getLatestSessionTime(u)).toLocaleString()}`
+                        : "Not active recently"
+                    }>
+                    <Clock size={11} className="text-zinc-500 shrink-0" />
+                    <span>{lastSeen}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom Tray */}
+              <div className="w-full  mt-4 y-3rounded-b-[24px] flex items-center justify-between gap-2 relative z-10">
+                {isDevLocked ? (
+                  <div className="flex-1 py-2 px-3 bg-white/[0.02] border border-white/[0.06] rounded-xl text-xs font-mono font-medium tracking-wider uppercase text-zinc-400 flex items-center justify-center gap-1.5">
+                    <Lock size={12} className="text-zinc-500" />
+                    <span>Protected</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setSelectedClearanceUser(u)}
+                    className="flex-1 py-2 px-3 bg-white/[0.04] hover:bg-white/[0.09] border border-white/[0.07] hover:border-white/20 rounded-xl text-xs font-semibold text-zinc-200 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98]">
+                    <Shield size={13} className="text-green-400" />
+                    <span>Update Role</span>
+                  </button>
+                )}
+
+                {/* Actions Button */}
+                {!isSuper && !isDevLocked && (
+                  <button
+                    onClick={() => setSelectedActionUser(u)}
+                    className="p-2 bg-white/[0.04] hover:bg-white/[0.09] border border-white/[0.07] hover:border-white/20 rounded-xl text-zinc-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+                    title="User options">
+                    <MoreHorizontal size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {users.length === 0 && (
+          <div className="col-span-full py-16 text-center text-zinc-500 text-sm font-semibold tracking-widest uppercase border border-white/[0.06] rounded-3xl bg-[#09090c]">
+            No users found.
           </div>
-        </div>
-      ))}
-      {users.length === 0 && (
-        <div className="col-span-full py-20 text-center text-zinc-600 text-sm font-bold tracking-widest uppercase border border-white/[0.06] rounded-3xl bg-zinc-950">
-          No identities found.
-        </div>
+        )}
+      </div>
+
+      {/* Portal-based Modals: Immune to Card Overflow & Stacking Context Clipping */}
+      {selectedClearanceUser && (
+        <ClearanceModal
+          user={selectedClearanceUser}
+          onClose={() => setSelectedClearanceUser(null)}
+          onSave={async (userId, newRole) => {
+            await onRoleChange(userId, newRole);
+          }}
+        />
       )}
-    </div>
+
+      {selectedActionUser && (
+        <UserActionsModal
+          user={selectedActionUser}
+          onClose={() => setSelectedActionUser(null)}
+          onEditUser={onEditUser}
+          onResetPassword={onResetPassword}
+          onToggleActive={onToggleActive}
+          onDeleteUser={onDeleteUser}
+        />
+      )}
+    </>
   );
 };
 

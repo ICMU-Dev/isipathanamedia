@@ -334,9 +334,11 @@ const AdminSidebar = ({
                 <a
                   key={item.path}
                   href={item.path}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={onClose}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onClose) onClose();
+                    window.location.replace(item.path);
+                  }}
                   title={collapsed ? item.name : undefined}
                   className={className}>
                   {content}

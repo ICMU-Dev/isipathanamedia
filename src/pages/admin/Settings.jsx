@@ -241,9 +241,7 @@ const Settings = () => {
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const VAPID_PUBLIC_KEY =
-        import.meta.env.VITE_VAPID_PUBLIC_KEY ||
-        "BDvKzqdXgPr7u-kietdGltOi9aPtHMB5jOJCSSgJ7sBfW6DRslAV130dXy4zp5FEKm7V3FpSSHeC7zyhqHD23xc";
+      const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
       if (!VAPID_PUBLIC_KEY) {
         showToast("error", "VAPID public key not found in env");

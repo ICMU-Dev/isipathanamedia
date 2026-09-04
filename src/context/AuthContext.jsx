@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { syncAuthCookies, clearAuthCookies } from '../utils/broadcasterSso';
 
 // ─── Session config ───────────────────────────────────────────
 const SESSION_KEY       = 'icmu_session';
@@ -18,13 +19,25 @@ function saveSession(profile, rememberMe = false) {
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
             localStorage.removeItem(SESSION_KEY);
         }
+        // Synchronize architecture-friendly cookies for cross-repo sharing (e.g. fm-vibhavi)
+        syncAuthCookies(session);
     } catch (_) {}
 }
 
 function loadSession() {
     try {
         let raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+        
+        // Fallback to cookie if missing from storage (e.g. returning from cross-domain new tab)
+        if (!raw && typeof document !== 'undefined') {
+            const match = document.cookie.match(new RegExp('(^|;\\s*)' + SESSION_KEY + '=([^;]*)'));
+            if (match) {
+                raw = decodeURIComponent(match[2]);
+            }
+        }
+
         if (!raw) return null;
+        
         const session = JSON.parse(raw);
         if (!session?.expiresAt || Date.now() > session.expiresAt) {
             clearSession();
@@ -38,8 +51,10 @@ function clearSession() {
     try { 
         localStorage.removeItem(SESSION_KEY);
         sessionStorage.removeItem(SESSION_KEY);
+        clearAuthCookies();
     } catch (_) {}
 }
+
 
 const DEVICE_ID_KEY = 'icmu_device_id';
 function getDeviceId() {

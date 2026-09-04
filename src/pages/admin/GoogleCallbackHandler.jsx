@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { getDefaultDashboardPath } from "../../utils/roles";
 
 const GoogleCallbackHandler = () => {
   const navigate = useNavigate();
@@ -117,13 +118,8 @@ const GoogleCallbackHandler = () => {
           if (result.success) {
             toast.success("Login successful.");
             const targetIdx = result.indexNumber || storedIndex || "25473";
-            const role = result.role?.toLowerCase() || "";
             if (mounted) {
-              if (role === "super-admin") {
-                navigate(`/${targetIdx}`, { replace: true });
-              } else {
-                navigate(`/${targetIdx}/dashboard`, { replace: true });
-              }
+              navigate(getDefaultDashboardPath(result.role, targetIdx), { replace: true });
             }
           } else {
             // Sign out of Supabase auth since our custom auth failed

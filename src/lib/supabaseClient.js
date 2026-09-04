@@ -13,7 +13,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 // Custom fetch to inject our x-user-index header for RLS
-const customFetch = (url, options) => {
+const customFetch = (url, options = {}) => {
   const headers = new Headers(options?.headers || {});
   
   const sessionStr = sessionStorage.getItem('icmu_session') || localStorage.getItem('icmu_session');
@@ -26,8 +26,7 @@ const customFetch = (url, options) => {
     } catch (e) {}
   }
   
-  options.headers = headers;
-  return fetch(url, options);
+  return fetch(url, { ...options, headers });
 };
 
 
@@ -46,13 +45,17 @@ export const supabase =
         },
       })
     : {
-        // Dummy client fallback...
+        // Dummy client fallback — mirrors the real Supabase client API surface
+        // so code that calls .channel(), .from(), etc. never throws at runtime.
         from: () => ({
           select: () => ({
             order: () => Promise.resolve({ data: [], error: null }),
             eq: () => ({
               maybeSingle: () => Promise.resolve({ data: null, error: null }),
+              single: () => Promise.resolve({ data: null, error: null }),
             }),
+            single: () => Promise.resolve({ data: null, error: null }),
+            limit: () => Promise.resolve({ data: [], error: null }),
           }),
           insert: () => ({
             select: () => Promise.resolve({ data: [], error: null }),
@@ -65,6 +68,7 @@ export const supabase =
           from: () => ({
             upload: () => Promise.resolve({ error: null }),
             getPublicUrl: () => ({ data: { publicUrl: "" } }),
+            remove: () => Promise.resolve({ error: null }),
           }),
         },
         rpc: () =>
@@ -72,4 +76,17 @@ export const supabase =
             data: null,
             error: { message: "Supabase not configured" },
           }),
+        // Realtime stubs — prevents "supabase.channel is not a function" crash
+        channel: () => ({
+          on: function () { return this; },
+          subscribe: function () { return this; },
+          unsubscribe: function () { return this; },
+        }),
+        removeChannel: () => Promise.resolve(),
+        auth: {
+          getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+          signOut: () => Promise.resolve({ error: null }),
+          signInWithOAuth: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+        },
       };

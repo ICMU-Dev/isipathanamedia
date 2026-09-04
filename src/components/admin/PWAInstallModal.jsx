@@ -11,6 +11,7 @@ import {
 import { usePWAInstall } from "../../hooks/usePWAInstall";
 import { useAuth } from "../../context/AuthContext";
 import MainLogos from "../../assets/main-logos.png";
+import { isAdmin, isWriter, isBroadcaster } from "../../utils/roles";
 
 const PWAInstallModal = () => {
   const { user } = useAuth();
@@ -18,13 +19,8 @@ const PWAInstallModal = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
 
-  const role = user?.role?.toLowerCase();
-  const isAuthorized =
-    role === "admin" ||
-    role === "super-admin" ||
-    role === "superadmin" ||
-    role === "super_admin" ||
-    role === "writer";
+  const role = user?.role;
+  const isAuthorized = isAdmin(role) || isWriter(role) || isBroadcaster(role);
 
   useEffect(() => {
     // Show one-time prompt modal after 2 seconds if user is logged in, app is installable, and not dismissed

@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { AnimatedBadge } from "../../../components/motion/animated-badge";
+import RoleMenuDropdown from "./RoleMenuDropdown";
 
 const formatLastSeen = (timestamp) => {
   if (!timestamp) return "Never";
@@ -162,30 +163,10 @@ const UserTableView = ({
                         Dev Lock
                       </AnimatedBadge>
                     ) : (
-                      <div className="relative inline-block w-48">
-                        <select
-                          value={u.role || "admin"}
-                          onChange={(e) => onRoleChange(u.id, e.target.value)}
-                          className="w-full appearance-none bg-black border border-white/[0.06]  rounded-2xl py-2.5 pl-4 pr-10 text-[13px] font-semibold text-white focus:outline-none focus:border-white/20 cursor-pointer transition-all shadow-sm">
-                          <option
-                            className="bg-[#000000] text-white"
-                            value="writer">
-                            Writer
-                          </option>
-                          <option
-                            className="bg-[#000000] text-white"
-                            value="admin">
-                            Admin
-                          </option>
-                          <option
-                            className="bg-[#000000] text-white font-bold"
-                            value="super-admin">
-                            Super Admin
-                          </option>
-                        </select>
-                        <ChevronDown
-                          size={16}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+                      <div className="w-48">
+                        <RoleMenuDropdown
+                          role={u.role || "admin"}
+                          onSave={(newRole) => onRoleChange(u.id, newRole)}
                         />
                       </div>
                     )}

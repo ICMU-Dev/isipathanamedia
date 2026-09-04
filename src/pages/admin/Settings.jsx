@@ -20,6 +20,7 @@ import {
   TabsContent,
 } from "../../components/motion/tabs";
 import { supabase } from "../../lib/supabaseClient";
+import { isAdmin, isSuperAdmin } from "../../utils/roles";
 import {
   Save,
   Download,
@@ -69,9 +70,10 @@ const Settings = () => {
   const unreadFeedbacks =
     notifications?.filter((n) => n.isFeedback && !n.read).length || 0;
 
-  const role = user?.role?.toLowerCase();
-  const isSuperAdmin =
-    role === "super-admin" || role === "superadmin" || role === "super_admin";
+  const role = user?.role;
+  const isSuper = isSuperAdmin(role);
+  const isSuperAdmin = isSuper;
+  const isAdm = isAdmin(role);
 
   const [activeTab, setActiveTab] = useState("appearance");
   const [configState, setConfigState] = useState(siteConfig || {});
@@ -512,7 +514,7 @@ const Settings = () => {
   // helper to resolve normalizedRole for tab filtering
   const normalizedRole = isSuperAdmin
     ? "super_admin"
-    : role === "admin"
+    : isAdm
       ? "admin"
       : "writer";
 

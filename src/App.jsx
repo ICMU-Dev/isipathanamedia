@@ -40,6 +40,12 @@ const SuperAdminLayout = React.lazy(
 const MasterDashboard = React.lazy(
   () => import("./pages/super-admin/MasterDashboard"),
 );
+const BroadcasterLayout = React.lazy(
+  () => import("./components/layout/BroadcasterLayout"),
+);
+const BroadcasterDashboard = React.lazy(
+  () => import("./pages/broadcaster/BroadcasterDashboard"),
+);
 
 // Admin pages
 const AdminLayout = React.lazy(() => import("./components/layout/AdminLayout"));
@@ -111,6 +117,10 @@ function App() {
                   <Route path="live" element={<LiveStreamSettings />} />
                                                       <Route path="settings" element={<Settings />} />
                   <Route path="profile" element={<UserProfile />} />
+                </Route>
+                {/* 3. Broadcaster Operations Branch */}
+                <Route path="broadcast" element={<BroadcasterLayout />}>
+                  <Route index element={<BroadcasterDashboard />} />
                 </Route>
 
               </Route>

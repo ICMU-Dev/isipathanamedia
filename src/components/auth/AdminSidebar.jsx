@@ -21,6 +21,14 @@ import { useNotification } from "../../context/NotificationContext";
 import MainLogos from "../../assets/main-logos.png";
 import ActiveAdmins from "../layout/ActiveAdmins";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  isAdmin,
+  isSuperAdmin,
+  isWriter,
+  canAccessBroadcastDashboard,
+  canAccessSuperAdminDashboard,
+  getBroadcasterAdminUrl,
+} from "../../utils/roles";
 
 const AdminSidebar = ({
   isOpen,
@@ -35,46 +43,52 @@ const AdminSidebar = ({
   const { news, siteConfig } = useData();
   const { notifications } = useNotification();
 
-  const role = user?.role?.toLowerCase();
-  const isSuperAdmin =
-    role === "super-admin" || role === "superadmin" || role === "super_admin";
-  const isAdmin = role === "admin" || isSuperAdmin;
-  const isWriter = role === "writer";
+  const role = user?.role;
+  const isSuper = isSuperAdmin(role);
+  const isAdm = isAdmin(role);
+  const isWrit = isWriter(role);
+  const hasBroadcasterAccess = canAccessBroadcastDashboard(role);
+  const basePath = `/${adminPath}`;
+
+  // Unread feedback count
+  const unreadFeedbackCount = React.useMemo(() => {
+    if (!notifications) return 0;
+    return notifications.filter((n) => !n.read).length;
+  }, [notifications]);
 
   const pendingCount = news?.filter((n) => n.status === "pending").length || 0;
-  const showAttentionBadge = isAdmin && pendingCount > 0;
+  const showAttentionBadge = isAdm && pendingCount > 0;
 
   const unreadFeedbacks =
     notifications?.filter((n) => n.isFeedback && !n.read).length || 0;
   const unreadMessages =
     notifications?.filter((n) => !n.isFeedback && !n.read).length || 0;
 
-  const showSettingsBadge = isAdmin && unreadFeedbacks > 0;
-  const showMessagesBadge = isAdmin && unreadMessages > 0;
+  const showSettingsBadge = isAdm && unreadFeedbacks > 0;
+  const showMessagesBadge = isAdm && unreadMessages > 0;
 
-  const basePath = `/${adminPath}`;
   const isActive = (path) => location.pathname === path;
 
   // On mobile (isOpen), always show full sidebar regardless of isCollapsed
   const collapsed = isCollapsed && !isOpen;
 
-  // Role-based navigation items
+  // Dynamic Navigation Items based on verified clearance
   const allNavItems = [
     {
-      name: "Dashboard",
+      name: "Overview",
       path: `${basePath}/dashboard`,
       icon: <LayoutDashboard size={18} />,
-      roles: ["writer", "admin", "super_admin"],
+      roles: ["admin", "super_admin", "writer"],
     },
     {
-      name: isWriter ? "My Articles" : "Newsroom",
+      name: "Newsroom",
       path: `${basePath}/dashboard/news`,
       icon: <Newspaper size={18} />,
-      roles: ["writer", "admin", "super_admin"],
+      roles: ["admin", "super_admin", "writer"],
     },
     {
       name: "Team",
-      path: `${basePath}/dashboard/team`,
+      path: `${basePath}/dashboard/users`,
       icon: <Users size={18} />,
       roles: ["admin", "super_admin"],
     },
@@ -90,7 +104,17 @@ const AdminSidebar = ({
       icon: <Radio size={18} />,
       roles: ["admin", "super_admin"],
     },
-
+    ...(hasBroadcasterAccess
+      ? [
+          {
+            name: "Broadcast Hub",
+            path: getBroadcasterAdminUrl(adminPath || user?.indexNumber, user),
+            icon: <Radio size={18} className="text-red-400" />,
+            roles: ["admin", "super_admin"],
+            external: true,
+          },
+        ]
+      : []),
     {
       name: "Profile",
       path: `${basePath}/dashboard/profile`,
@@ -106,9 +130,9 @@ const AdminSidebar = ({
   ];
 
   // Normalize role for matching
-  const normalizedRole = isSuperAdmin
+  const normalizedRole = isSuper
     ? "super_admin"
-    : isWriter
+    : isWrit
       ? "writer"
       : "admin";
   const navItems = allNavItems.filter((item) =>
@@ -210,23 +234,11 @@ const AdminSidebar = ({
 
         <nav className="space-y-0.5">
           {navItems.map((item) => {
-            const active = isActive(item.path);
+            const isExternal = item.external || (typeof item.path === 'string' && item.path.startsWith('http'));
+            const active = !isExternal && isActive(item.path);
 
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={onClose}
-                title={collapsed ? item.name : undefined}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-150 relative ${
-                  collapsed ? "justify-center" : ""
-                } ${
-                  active
-                    ? item.name === "Live Stream"
-                      ? "bg-red-600/10 text-theme-primary font-medium"
-                      : "bg-[color:var(--accent)]/10 text-theme-primary font-medium"
-                    : "text-theme-primary opacity-45 hover:bg-white/[0.03] hover:text-theme-primary"
-                }`}>
+            const content = (
+              <>
                 {/* Subtle left accent for active */}
                 {active && (
                   <motion.div
@@ -259,8 +271,11 @@ const AdminSidebar = ({
                       initial={{ opacity: 0, width: 0 }}
                       animate={{ opacity: 1, width: "auto" }}
                       exit={{ opacity: 0, width: 0 }}
-                      className="text-[13px] tracking-wide whitespace-nowrap overflow-hidden flex-1">
-                      {item.name}
+                      className="text-[13px] tracking-wide whitespace-nowrap overflow-hidden flex-1 flex items-center justify-between">
+                      <span>{item.name}</span>
+                      {isExternal && (
+                        <ExternalLink size={12} className="opacity-40 group-hover:opacity-80 ml-1.5 shrink-0" />
+                      )}
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -301,6 +316,42 @@ const AdminSidebar = ({
                     }`}
                   />
                 )}
+              </>
+            );
+
+            const className = `group flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-150 relative ${
+              collapsed ? "justify-center" : ""
+            } ${
+              active
+                ? item.name === "Live Stream"
+                  ? "bg-red-600/10 text-theme-primary font-medium"
+                  : "bg-[color:var(--accent)]/10 text-theme-primary font-medium"
+                : "text-theme-primary opacity-45 hover:bg-white/[0.03] hover:text-theme-primary"
+            }`;
+
+            if (isExternal) {
+              return (
+                <a
+                  key={item.path}
+                  href={item.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onClose}
+                  title={collapsed ? item.name : undefined}
+                  className={className}>
+                  {content}
+                </a>
+              );
+            }
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={onClose}
+                title={collapsed ? item.name : undefined}
+                className={className}>
+                {content}
               </Link>
             );
           })}

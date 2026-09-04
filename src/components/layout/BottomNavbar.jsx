@@ -18,6 +18,13 @@ import GlassSurface from "../ui/GlassSurface";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import { MorphingModal } from "../motion/morphing-modal";
+import {
+  isAdmin,
+  isSuperAdmin,
+  isWriter,
+  canAccessBroadcastDashboard,
+  getBroadcasterAdminUrl,
+} from "../../utils/roles";
 
 const BottomNavbar = () => {
   const location = useLocation();
@@ -41,17 +48,17 @@ const BottomNavbar = () => {
 
   const isActive = (path) => optimisticPath === path;
 
-  const role = user?.role?.toLowerCase();
-  const isSuperAdmin =
-    role === "super-admin" || role === "superadmin" || role === "super_admin";
-  const isAdmin = role === "admin" || isSuperAdmin;
-  const isWriter = role === "writer";
+  const role = user?.role;
+  const isSuper = isSuperAdmin(role);
+  const isAdm = isAdmin(role);
+  const isWrit = isWriter(role) && !isAdm;
+  const hasBroadcasterAccess = canAccessBroadcastDashboard(role);
 
   const { news } = useData();
   const { notifications, markAllMessagesAsRead } = useNotification();
 
   const pendingCount = news?.filter((n) => n.status === "pending").length || 0;
-  const showNewsBadge = isAdmin && pendingCount > 0;
+  const showNewsBadge = isAdm && pendingCount > 0;
 
   const unreadFeedbacks =
     notifications?.filter((n) => n.isFeedback && !n.read).length || 0;
@@ -61,7 +68,7 @@ const BottomNavbar = () => {
   const isStandalone =
     window.matchMedia("(display-mode: standalone)").matches ||
     window.navigator.standalone === true;
-  const showSettingsBadge = isAdmin && unreadFeedbacks > 0;
+  const showSettingsBadge = isAdm && unreadFeedbacks > 0;
   // Auto-clear message notifications when visiting the Chat tab
   useEffect(() => {
     if (location.pathname === `${basePath}/dashboard/messages`) {
@@ -85,7 +92,7 @@ const BottomNavbar = () => {
       roles: ["writer", "admin", "super_admin"],
     },
     {
-      name: isWriter ? "Articles" : "News",
+      name: isWrit ? "Articles" : "News",
       path: `${basePath}/dashboard/news`,
       icon: <Newspaper size={18} />,
       roles: ["writer", "admin", "super_admin"],
@@ -125,7 +132,17 @@ const BottomNavbar = () => {
       roles: ["admin", "super_admin"],
       hasNotification: unreadMessages > 0,
     },
-
+    ...(hasBroadcasterAccess
+      ? [
+          {
+            name: "Broadcast",
+            path: getBroadcasterAdminUrl(adminPath || user?.indexNumber, user),
+            icon: <Radio size={18} className="text-red-400" />,
+            roles: ["admin", "super_admin"],
+            external: true,
+          },
+        ]
+      : []),
     {
       name: "Settings",
       path: `${basePath}/dashboard/settings`,
@@ -136,10 +153,10 @@ const BottomNavbar = () => {
   ];
 
   const allowedNavItems = allNavItems.filter((item) => {
-    if (isSuperAdmin)
+    if (isSuper)
       return item.roles.includes("super_admin") || item.roles.includes("admin");
-    if (isAdmin) return item.roles.includes("admin");
-    if (isWriter) return item.roles.includes("writer");
+    if (isAdm) return item.roles.includes("admin");
+    if (isWrit) return item.roles.includes("writer");
     return false;
   });
 
@@ -246,6 +263,9 @@ const BottomNavbar = () => {
       if (pressedPath) {
         if (pressedPath === "more") {
           setShowMore((prev) => !prev);
+        } else if (pressedPath.startsWith("http")) {
+          window.open(pressedPath, "_blank");
+          setShowMore(false);
         } else {
           setOptimisticPath(pressedPath); // Optimistic UI update to prevent glitches
           navigate(pressedPath);
@@ -380,25 +400,52 @@ const BottomNavbar = () => {
         {showMore === true ? (
           <div>
             <div className="grid grid-cols-3 gap-2 min-w-[80%] relative z-10">
-              {overflowItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  draggable="false"
-                  style={{ WebkitUserDrag: "none" }}
-                  onClick={() => setShowMore(false)}
-                  className="flex flex-col items-center justify-center  p-3 rounded-2xl bg-black/50 border border-white/[0.06]  hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white relative overflow-hidden group">
-                  <div className="relative">
-                    {item.icon}
-                    {item.hasNotification && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-theme-accent rounded-full border border-black shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
-                    )}
-                  </div>
-                  <span className="text-[10px] font-semibold text-center mt-1">
-                    {item.name}
-                  </span>
-                </Link>
-              ))}
+              {overflowItems.map((item) => {
+                const isExternal = item.external || (typeof item.path === 'string' && item.path.startsWith('http'));
+                const content = (
+                  <>
+                    <div className="relative">
+                      {item.icon}
+                      {item.hasNotification && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-theme-accent rounded-full border border-black shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+                      )}
+                    </div>
+                    <span className="text-[10px] font-semibold text-center mt-1">
+                      {item.name}
+                    </span>
+                  </>
+                );
+
+                const itemClass = "flex flex-col items-center justify-center p-3 rounded-2xl bg-black/50 border border-white/[0.06] hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white relative overflow-hidden group";
+
+                if (isExternal) {
+                  return (
+                    <a
+                      key={item.path}
+                      href={item.path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      draggable="false"
+                      style={{ WebkitUserDrag: "none" }}
+                      onClick={() => setShowMore(false)}
+                      className={itemClass}>
+                      {content}
+                    </a>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    draggable="false"
+                    style={{ WebkitUserDrag: "none" }}
+                    onClick={() => setShowMore(false)}
+                    className={itemClass}>
+                    {content}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ) : null}

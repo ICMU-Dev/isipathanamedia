@@ -19,6 +19,7 @@ import MainLogos from "../../assets/main-logos.png";
 import NotFoundPage from "../NotFoundPage";
 import Strands from "../../components/ui/Strands";
 import DotField from "../../components/ui/DotField";
+import { getDefaultDashboardPath } from "../../utils/roles";
 
 const AdminLogin = ({ urlIndexNo }) => {
   const { login, setPassword, checkUser } = useAuth();
@@ -182,12 +183,7 @@ const AdminLogin = ({ urlIndexNo }) => {
     if (result.success) {
       localStorage.removeItem(rlKey);
       toast.success("Login successful.");
-      const role = result.role?.toLowerCase() || "";
-      if (role === "super-admin") {
-        navigate(`/${urlIndexNo}`);
-      } else {
-        navigate(`/${urlIndexNo}/dashboard`);
-      }
+      navigate(getDefaultDashboardPath(result.role, urlIndexNo));
     } else {
       attempts.count += 1;
       attempts.timestamp = Date.now();
@@ -214,13 +210,8 @@ const AdminLogin = ({ urlIndexNo }) => {
 
     if (result.success) {
       toast.success("System Reset Protocol Activated.");
-      // setPassword auto-logs in — navigate straight to dashboard
-      const role = result.role?.toLowerCase() || "";
-      if (role === "super-admin") {
-        navigate(`/${urlIndexNo}`);
-      } else {
-        navigate(`/${urlIndexNo}/dashboard`);
-      }
+      // setPassword auto-logs in — navigate straight to target dashboard
+      navigate(getDefaultDashboardPath(result.role, urlIndexNo));
     } else {
       showError(result.message || "Setup failed.");
     }

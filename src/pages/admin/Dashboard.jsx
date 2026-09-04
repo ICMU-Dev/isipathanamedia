@@ -32,7 +32,7 @@ import { ArticleSystemModal } from "../../components/admin/dashboard/ChangelogMo
 import StatCard from "../../components/admin/dashboard/StatCard";
 import DashboardSkeleton from "../../components/admin/DashboardSkeleton";
 import { AnimatedNumber } from "../../components/motion/animated-number";
-
+import { isAdmin, isWriter as checkIsWriter } from "../../utils/roles";
 
 const Dashboard = () => {
   const { stats, news = [], messages = [], team = [], siteConfig = {}, isFetching } = useData();
@@ -41,7 +41,7 @@ const Dashboard = () => {
 
   const basePath = `/${adminPath}`;
 
-  const isWriter = user?.role?.toLowerCase() === "writer";
+  const isWriter = checkIsWriter(user?.role) && !isAdmin(user?.role);
 
   const [showUpdateModal, setShowUpdateModal] = React.useState(false);
   const [selectedLog, setSelectedLog] = React.useState(null);

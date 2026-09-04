@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
+import { isAdmin, isWriter, isBroadcaster } from "../../utils/roles";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -195,14 +196,8 @@ const FeedbackWidget = () => {
   const device = useMemo(() => detectDevice(), []);
 
   const isAuthorized = useMemo(() => {
-    const r = user?.role?.toLowerCase();
-    return (
-      r === "admin" ||
-      r === "super-admin" ||
-      r === "superadmin" ||
-      r === "super_admin" ||
-      r === "writer"
-    );
+    const r = user?.role;
+    return isAdmin(r) || isWriter(r) || isBroadcaster(r);
   }, [user?.role]);
 
   const [form, setForm] = useState({

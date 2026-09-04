@@ -14,10 +14,13 @@ import {
   List,
   LayoutGrid,
   ArrowRight,
+  ExternalLink,
   Activity,
   BookOpen,
   Database,
+  RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import SystemDocumentation from "./SystemDocumentation";
@@ -26,8 +29,19 @@ import AddUserModal from "./components/AddUserModal";
 import EditUserModal from "./components/EditUserModal";
 import UserTableView from "./components/UserTableView";
 import UserCardGrid from "./components/UserCardGrid";
+import RoleGuidelinesModal from "./components/RoleGuidelinesModal";
 
 import { AnimatedNumber } from "../../components/motion/animated-number";
+import {
+  canAccessSuperAdminDashboard,
+  canAccessHub,
+  isAdmin,
+  isSuperAdmin,
+  isBroadcaster,
+  getDefaultDashboardPath,
+  formatStoredRole,
+  getBroadcasterAdminUrl,
+} from "../../utils/roles";
 
 const TabButton = ({ value, label, activeTab, onClick, icon: Icon }) => (
   <button
@@ -42,7 +56,8 @@ const TabButton = ({ value, label, activeTab, onClick, icon: Icon }) => (
   </button>
 );
 
-const Card = ({ title, description, linkTo, btnTitle, icon: Icon, disabled }) => {
+const Card = ({ title, description, linkTo, btnTitle, icon: Icon, disabled, external }) => {
+  const isExternal = external || (typeof linkTo === 'string' && linkTo.startsWith('http'));
   return (
     <div className={`group relative rounded-2xl overflow-hidden bg-[#09090b] transition-all duration-500 shadow-xl shadow-black/50 border border-white/[0.06]  ${disabled ? 'opacity-50 grayscale' : 'hover:shadow-2xl hover:border-white/20'}`}>
       <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-white/10 transition-all duration-700"></div>
@@ -67,6 +82,17 @@ const Card = ({ title, description, linkTo, btnTitle, icon: Icon, disabled }) =>
             <div className="w-full py-3.5 sm:py-4 px-5 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-bold bg-white/5 border border-white/5 text-zinc-500 cursor-not-allowed">
               <span className="uppercase tracking-widest">OFFLINE</span>
             </div>
+          ) : isExternal ? (
+            <a
+              href={linkTo}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3.5 sm:py-4 px-5 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-bold transition-all duration-300 bg-white/5 border border-white/5 text-white hover:bg-white hover:text-black hover:border-white/5">
+              <span className="uppercase tracking-widest">{btnTitle}</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-black/20 transform group-hover:translate-x-1 transition-all duration-300">
+                <ExternalLink size={14} className="sm:w-[16px] sm:h-[16px]" />
+              </div>
+            </a>
           ) : (
             <Link
               to={linkTo}
@@ -120,6 +146,7 @@ const MasterDashboard = () => {
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState({ id: null, full_name: "" });
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [isRoleGuideModalOpen, setIsRoleGuideModalOpen] = useState(false);
   
   // Hidden dev mode toggle
   const [devClicks, setDevClicks] = useState(0);
@@ -140,13 +167,16 @@ const MasterDashboard = () => {
 
   const basePath = `/${adminPath}`;
 
+  const isSuper = isSuperAdmin(user?.role);
+  const isAuthorized = canAccessHub(user?.role);
+
   useEffect(() => {
-    if (activeTab === "users") {
+    if (isSuper && activeTab === "users") {
       fetchUsers();
     }
-  }, [activeTab]);
+  }, [activeTab, isSuper]);
 
-  if (user?.role !== "super-admin") {
+  if (!isAuthorized) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4 animate-fade-in px-4">
         <div className="w-20 h-20 bg-red-600/10 rounded-full flex items-center justify-center border border-red-600/20 mb-4 shadow-[0_0_40px_rgba(239,68,68,0.2)]">
@@ -159,7 +189,7 @@ const MasterDashboard = () => {
           You do not have the required clearance level to access this terminal.
         </p>
         <Link
-          to={`${basePath}/dashboard`}
+          to={getDefaultDashboardPath(user?.role, adminPath)}
           className="mt-8 px-8 py-3.5 bg-white text-black hover:bg-zinc-200 font-semibold rounded-full transition-all shadow-md hover:shadow-lg">
           Return Home
         </Link>
@@ -193,13 +223,14 @@ const MasterDashboard = () => {
     if (!newUser.full_name || !newUser.index_number) return;
 
     try {
+      const formattedRole = formatStoredRole(newUser.role || "admin");
       const { data, error } = await supabase
         .from("users")
         .insert([
           {
             full_name: newUser.full_name,
             index_number: newUser.index_number,
-            role: newUser.role,
+            role: formattedRole,
             is_active: true,
           },
         ])
@@ -210,6 +241,7 @@ const MasterDashboard = () => {
       setUsers((prev) => [data[0], ...prev]);
       setNewUser({ full_name: "", index_number: "", role: "admin" });
       setIsAddUserModalOpen(false);
+      fetchUsers();
     } catch (error) {
       alert(`Failed to add user: ${error.message}`);
     }
@@ -304,14 +336,16 @@ const MasterDashboard = () => {
   };
 
   const handleRoleChange = async (id, newRole) => {
+    const formattedRole = formatStoredRole(newRole);
     try {
-      setUsers(users.map((u) => (u.id === id ? { ...u, role: newRole } : u)));
+      setUsers(users.map((u) => (u.id === id ? { ...u, role: formattedRole } : u)));
       const { error } = await supabase
         .from("users")
-        .update({ role: newRole })
+        .update({ role: formattedRole })
         .eq("id", id);
 
       if (error) throw error;
+      fetchUsers();
     } catch (error) {
       alert(`Role update failed: ${error.message}`);
       fetchUsers();
@@ -321,7 +355,7 @@ const MasterDashboard = () => {
   const totalUsers = users.length;
   const activeAdmins = users.filter(
     (u) =>
-      u.is_active !== false && (u.role === "admin" || u.role === "super-admin"),
+      u.is_active !== false && (isAdmin(u.role) || isBroadcaster(u.role)),
   ).length;
   const localAuthCount = users.filter((u) => !u.email).length;
 
@@ -348,11 +382,13 @@ const MasterDashboard = () => {
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tight text-white leading-[1.1]">
               Welcome, <br className="sm:hidden" />
               <span className="text-white font-bold">
-                {user?.name?.split(" ")[0] || "Admin"}
+                {user?.name?.split(" ")[0] || (isSuper ? "Admin" : "Operator")}
               </span>
             </h2>
             <p className="text-zinc-500 font-medium text-sm sm:text-base max-w-sm mt-2">
-              Manage the global state and security architecture.
+              {isSuper
+                ? "Manage the global state and security architecture."
+                : "Dual clearance operations hub. Select a terminal to begin."}
             </p>
           </div>
 
@@ -364,42 +400,44 @@ const MasterDashboard = () => {
           </button>
         </div>
 
-        {/* Dynamic Tabs (Pill style) */}
-        <div className="flex bg-zinc-950 p-1.5 rounded-2xl border border-white/[0.06]  shadow-inner w-full sm:w-fit overflow-x-auto no-scrollbar gap-1">
-          <TabButton
-            value="overview"
-            icon={LayoutDashboard}
-            label="Overview"
-            activeTab={activeTab}
-            onClick={setActiveTab}
-          />
-          <TabButton
-            value="users"
-            icon={Users}
-            label="Access Control"
-            activeTab={activeTab}
-            onClick={setActiveTab}
-          />
-          <TabButton
-            value="docs"
-            icon={BookOpen}
-            label="Architecture & Docs"
-            activeTab={activeTab}
-            onClick={setActiveTab}
-          />
-          <TabButton
-            value="storage"
-            icon={Database}
-            label="Storage Manager"
-            activeTab={activeTab}
-            onClick={setActiveTab}
-          />
-        </div>
+        {/* Dynamic Tabs (Pill style) - Only for Super Admin */}
+        {isSuper && (
+          <div className="flex bg-zinc-950 p-1.5 rounded-2xl border border-white/[0.06] shadow-inner w-full sm:w-fit overflow-x-auto no-scrollbar gap-1">
+            <TabButton
+              value="overview"
+              icon={LayoutDashboard}
+              label="Overview"
+              activeTab={activeTab}
+              onClick={setActiveTab}
+            />
+            <TabButton
+              value="users"
+              icon={Users}
+              label="Access Control"
+              activeTab={activeTab}
+              onClick={setActiveTab}
+            />
+            <TabButton
+              value="docs"
+              icon={BookOpen}
+              label="Architecture & Docs"
+              activeTab={activeTab}
+              onClick={setActiveTab}
+            />
+            <TabButton
+              value="storage"
+              icon={Database}
+              label="Storage Manager"
+              activeTab={activeTab}
+              onClick={setActiveTab}
+            />
+          </div>
+        )}
 
         {/* --- CONTENT AREA --- */}
 
-        {/* 1. OVERVIEW VIEW */}
-        {activeTab === "overview" && (
+        {/* 1. OVERVIEW VIEW - Always visible for Dual Clearance operators, or when activeTab is overview */}
+        {(!isSuper || activeTab === "overview") && (
           <div className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
               <Card
@@ -411,18 +449,19 @@ const MasterDashboard = () => {
               />
               <Card
                 title="Broadcasting Admin"
-                description="Live Broadcasting system. Currently offline for maintenance."
+                description="Live Broadcasting operations terminal, telemetry, and stream infrastructure."
                 icon={ScanLine}
-                linkTo="#"
+                linkTo={getBroadcasterAdminUrl(adminPath || user?.indexNumber, user)}
                 btnTitle="Launch Protocol"
-                disabled={true}
+                disabled={false}
+                external={true}
               />
             </div>
           </div>
         )}
 
-        {/* 2. USER ACCESS MANAGEMENT */}
-        {activeTab === "users" && (
+        {/* 2. USER ACCESS MANAGEMENT - Super Admin Only */}
+        {isSuper && activeTab === "users" && (
           <div className="space-y-6 animate-fade-in">
             {/* Quick Stats iOS style */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -474,11 +513,30 @@ const MasterDashboard = () => {
                     <LayoutGrid size={18} />
                   </button>
                 </div>
-                <button
-                  onClick={() => setIsAddUserModalOpen(true)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-zinc-200 rounded-2xl text-sm font-bold transition-all shadow-md hover:shadow-lg">
-                  <Plus size={18} strokeWidth={2.5} /> New Identity
-                </button>
+
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <button
+                    onClick={() => {
+                      fetchUsers();
+                      toast.success("Identity records refreshed");
+                    }}
+                    className="p-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-2xl border border-white/[0.06] transition-all cursor-pointer"
+                    title="Refresh data">
+                    <RefreshCw size={16} className={isLoadingUsers ? "animate-spin text-white" : ""} />
+                  </button>
+                  <button
+                    onClick={() => setIsRoleGuideModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-2xl border border-white/[0.08] text-xs font-bold transition-all cursor-pointer shadow-sm"
+                    title="View Role Guidelines & Clearance Matrix">
+                    <BookOpen size={15} className="text-cyan-400" />
+                    <span className="hidden sm:inline">Guidelines</span>
+                  </button>
+                  <button
+                    onClick={() => setIsAddUserModalOpen(true)}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-zinc-200 rounded-2xl text-sm font-bold transition-all shadow-md hover:shadow-lg cursor-pointer">
+                    <Plus size={18} strokeWidth={2.5} /> New Identity
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -521,30 +579,38 @@ const MasterDashboard = () => {
           </div>
         )}
 
-        {/* 3. STORAGE MANAGER */}
-        {activeTab === "storage" && <DatabaseStatus />}
+        {/* 3. STORAGE MANAGER - Super Admin Only */}
+        {isSuper && activeTab === "storage" && <DatabaseStatus />}
 
-        {/* 4. SYSTEM DOCUMENTATION */}
-        {activeTab === "docs" && <SystemDocumentation />}
+        {/* 4. SYSTEM DOCUMENTATION - Super Admin Only */}
+        {isSuper && activeTab === "docs" && <SystemDocumentation />}
       </div>
 
-      {/* --- ADD USER MODAL --- */}
-      <AddUserModal
-        isOpen={isAddUserModalOpen}
-        onClose={() => setIsAddUserModalOpen(false)}
-        newUser={newUser}
-        setNewUser={setNewUser}
-        onSubmit={handleAddUser}
-      />
+      {/* --- MODALS - Super Admin Only --- */}
+      {isSuper && (
+        <>
+          <AddUserModal
+            isOpen={isAddUserModalOpen}
+            onClose={() => setIsAddUserModalOpen(false)}
+            newUser={newUser}
+            setNewUser={setNewUser}
+            onSubmit={handleAddUser}
+          />
 
-      {/* --- EDIT USER MODAL --- */}
-      <EditUserModal
-        isOpen={isEditUserModalOpen}
-        onClose={() => setIsEditUserModalOpen(false)}
-        editingUser={editingUser}
-        setEditingUser={setEditingUser}
-        onSubmit={handleUpdateUser}
-      />
+          <EditUserModal
+            isOpen={isEditUserModalOpen}
+            onClose={() => setIsEditUserModalOpen(false)}
+            editingUser={editingUser}
+            setEditingUser={setEditingUser}
+            onSubmit={handleUpdateUser}
+          />
+
+          <RoleGuidelinesModal
+            isOpen={isRoleGuideModalOpen}
+            onClose={() => setIsRoleGuideModalOpen(false)}
+          />
+        </>
+      )}
 
     </div>
   );

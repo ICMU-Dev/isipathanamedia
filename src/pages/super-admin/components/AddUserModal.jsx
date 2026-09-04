@@ -1,5 +1,6 @@
 import React from "react";
-import { X, ChevronDown } from "lucide-react";
+import { X } from "lucide-react";
+import RolePicker from "./RolePicker";
 
 const AddUserModal = ({ isOpen, onClose, newUser, setNewUser, onSubmit }) => {
   if (!isOpen) return null;
@@ -57,32 +58,12 @@ const AddUserModal = ({ isOpen, onClose, newUser, setNewUser, onSubmit }) => {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-white">
-                Clearance Level
+                Clearance Matrix
               </label>
-              <div className="relative">
-                <select
-                  value={newUser.role}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, role: e.target.value })
-                  }
-                  className="w-full appearance-none bg-[#000000] border border-white/5 rounded-2xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-white/5focus:ring-1 focus:ring-white/50 transition-all cursor-pointer shadow-inner">
-                  <option className="bg-[#000000] text-white" value="writer">
-                    Writer
-                  </option>
-                  <option className="bg-[#000000] text-white" value="admin">
-                    Admin
-                  </option>
-                  <option
-                    className="bg-[#000000] text-white"
-                    value="super-admin">
-                    Super Admin
-                  </option>
-                </select>
-                <ChevronDown
-                  size={16}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
-                />
-              </div>
+              <RolePicker
+                value={newUser.role || "admin"}
+                onChange={(role) => setNewUser({ ...newUser, role })}
+              />
             </div>
 
             <div className="pt-6 mt-4 border-t border-white/[0.06] ">

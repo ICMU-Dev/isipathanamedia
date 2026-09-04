@@ -3,15 +3,15 @@ import {
   Globe,
   ShieldOff,
   Key,
-  ChevronDown,
+  Shield,
   MoreVertical,
   Edit2,
   PowerOff,
   Trash2,
   Clock,
-  LogOut,
 } from "lucide-react";
 import { AnimatedBadge } from "../../../components/motion/animated-badge";
+import RoleMenuDropdown from "./RoleMenuDropdown";
 
 const formatLastSeen = (timestamp) => {
   if (!timestamp) return "Never";
@@ -71,18 +71,20 @@ const UserCardGrid = ({
       {users.map((u) => (
         <div
           key={u.id}
-          className="rounded-2xl shadow-xl bg-[#09090b] flex flex-col relative group hover:shadow-2xl transition-all duration-300 border border-white/[0.06]  hover:border-white/20">
-          <div className="p-4 sm:p-6 flex items-start gap-3 sm:gap-4 relative z-10">
+          className="rounded-3xl bg-[#09090b] hover:bg-[#0c0c0e] border border-white/[0.08] hover:border-white/20 transition-all duration-300 flex flex-col justify-between overflow-visible relative group shadow-xl hover:shadow-2xl">
+          {/* Card Top Section: Avatar, Identity, Badges, 3-dots */}
+          <div className="p-5 sm:p-6 flex items-start gap-3.5 sm:gap-4 relative z-10">
+            {/* Avatar */}
             <div className="relative shrink-0">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl sm:rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-lg sm:text-xl font-bold text-white overflow-hidden shadow-inner">
-                <span className="absolute flex items-center justify-center w-full h-full">
+              <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-lg font-bold text-white overflow-hidden shadow-inner relative">
+                <span className="flex items-center justify-center w-full h-full text-zinc-300 font-semibold select-none">
                   {u.full_name?.charAt(0)}
                 </span>
                 {u.avatar_url && (
                   <img
                     src={u.avatar_url}
                     alt={u.full_name}
-                    className="w-full h-full object-cover relative z-10"
+                    className="w-full h-full object-cover absolute inset-0 z-10"
                     onError={(e) => {
                       e.currentTarget.style.display = "none";
                     }}
@@ -90,25 +92,28 @@ const UserCardGrid = ({
                 )}
               </div>
               {u.is_active !== false && (
-                <div className="absolute top-1 right-1 w-3 h-3 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.4)] border-2 border-black" />
+                <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] border-2 border-[#09090b]" />
               )}
             </div>
 
-            <div className="min-w-0 flex-1 pt-1">
-              <h4 className="font-bold text-base sm:text-lg text-white tracking-tight leading-tight truncate">
+            {/* Name & Identity */}
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h4
+                className="font-bold text-base sm:text-[17px] text-white tracking-tight leading-snug line-clamp-2"
+                title={u.full_name}>
                 {u.full_name}
               </h4>
-              <div className="text-[11px] text-zinc-500 font-mono tracking-widest uppercase mt-0.5">
-                {u.index_number}
-              </div>
+              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                <span className="font-mono text-[10px] text-zinc-400 font-medium tracking-wider bg-white/[0.04] px-2 py-0.5 rounded-md border border-white/5">
+                  #{u.index_number}
+                </span>
 
-              <div className="flex items-center gap-2 mt-3">
                 {u.email ? (
                   <AnimatedBadge
                     status="info"
                     size="sm"
                     icon={<Globe size={10} />}
-                    className="uppercase tracking-widest font-bold text-[9px]">
+                    className="uppercase tracking-widest font-bold text-[9px] py-0.5">
                     Google SSO
                   </AnimatedBadge>
                 ) : (
@@ -116,13 +121,14 @@ const UserCardGrid = ({
                     status="warning"
                     size="sm"
                     icon={<ShieldOff size={10} />}
-                    className="uppercase tracking-widest font-bold text-[9px]">
+                    className="uppercase tracking-widest font-bold text-[9px] py-0.5">
                     Local Hash
                   </AnimatedBadge>
                 )}
               </div>
             </div>
 
+            {/* 3-Dots Action Menu */}
             {u.role !== "super-admin" &&
               u.index_number !== "24929" &&
               u.index_number !== "25473" && (
@@ -134,35 +140,35 @@ const UserCardGrid = ({
                       e.stopPropagation();
                       setOpenMenuId(openMenuId === u.id ? null : u.id);
                     }}
-                    className="p-2 text-zinc-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-transparent hover:border-white/5">
-                    <MoreVertical size={20} />
+                    className="p-2 text-zinc-500 hover:text-white bg-white/[0.03] hover:bg-white/10 rounded-xl transition-all border border-white/5 hover:border-white/10 cursor-pointer">
+                    <MoreVertical size={18} />
                   </button>
                   {openMenuId === u.id && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[var(--admin-input-bg)]   border border-white/5 shadow-2xl ring-1 ring-white/5 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right overflow-hidden p-1.5 flex flex-col gap-1 backdrop-blur-sm">
+                    <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-zinc-950 border border-white/10 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right overflow-hidden p-1.5 flex flex-col gap-1 backdrop-blur-md">
                       <button
                         onClick={() => {
                           onEditUser(u);
                           setOpenMenuId(null);
                         }}
-                        className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-zinc-400 hover:bg-white/10 hover:text-white transition-colors">
-                        <Edit2 size={16} /> Rename
+                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer">
+                        <Edit2 size={14} /> Rename Protocol
                       </button>
                       <button
                         onClick={() => {
                           onResetPassword(u.id);
                           setOpenMenuId(null);
                         }}
-                        className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-zinc-400 hover:bg-white/10 hover:text-white transition-colors">
-                        <Key size={16} /> Password
+                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors cursor-pointer">
+                        <Key size={14} /> Force Password
                       </button>
                       <button
                         onClick={() => {
                           onToggleActive(u.id, u.is_active);
                           setOpenMenuId(null);
                         }}
-                        className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-amber-500 hover:bg-amber-500/10 hover:text-amber-300 transition-colors">
-                        <PowerOff size={16} />{" "}
-                        {u.is_active !== false ? "Suspend" : "Restore"}
+                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 transition-colors cursor-pointer">
+                        <PowerOff size={14} />{" "}
+                        {u.is_active !== false ? "Suspend Access" : "Restore Access"}
                       </button>
                       <div className="h-px bg-white/10 my-1 mx-2"></div>
                       <button
@@ -170,8 +176,8 @@ const UserCardGrid = ({
                           onDeleteUser(u.id);
                           setOpenMenuId(null);
                         }}
-                        className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3 text-sm font-semibold text-red-600 hover:bg-red-600/10 hover:text-red-300 transition-colors">
-                        <Trash2 size={16} /> Terminate
+                        className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 text-xs font-semibold text-red-500 hover:bg-red-600/10 hover:text-red-400 transition-colors cursor-pointer">
+                        <Trash2 size={14} /> Terminate
                       </button>
                     </div>
                   )}
@@ -179,75 +185,59 @@ const UserCardGrid = ({
               )}
           </div>
 
-          <div className="px-5 sm:px-6 py-5 bg-[#050505] border-t border-white/[0.06]  flex-1 flex flex-col justify-end space-y-4">
-            <div className="flex flex-col gap-2.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                Clearance Level
-              </label>
-              {u.index_number === "24929" || u.index_number === "25473" ? (
-                <AnimatedBadge
-                  status="neutral"
-                  size="md"
-                  icon={<Key size={14} />}
-                  className="uppercase tracking-widest font-bold bg-white/5 border border-white/5 text-[11px] w-full justify-center">
-                  Developer Lock
-                </AnimatedBadge>
-              ) : (
-                <div className="relative">
-                  <select
-                    value={u.role || "admin"}
-                    onChange={(e) => onRoleChange(u.id, e.target.value)}
-                    className="w-full appearance-none bg-[#050505] border border-white/5 rounded-2xl py-3 pl-4 pr-10 text-sm font-bold text-white focus:outline-none focus:border-white/30 cursor-pointer shadow-sm transition-all">
-                    <option className="bg-[#000000] text-white" value="writer">
-                      Writer
-                    </option>
-                    <option className="bg-[#000000] text-white" value="admin">
-                      Admin
-                    </option>
-                    <option
-                      className="bg-[#000000] text-white"
-                      value="super-admin">
-                      Super Admin
-                    </option>
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
-                  />
-                </div>
-              )}
+          {/* Card Middle Section: Clearance Level Dropdown */}
+          <div className="px-5 sm:px-6 py-4 bg-black/40 border-t border-white/[0.06] flex-1 flex flex-col justify-end space-y-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+              <Shield size={11} className="text-zinc-500" />
+              <span>Clearance Level</span>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-white/[0.06] ">
+            {u.index_number === "24929" || u.index_number === "25473" ? (
+              <div className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-white/[0.03] border border-white/10 rounded-2xl text-xs font-mono font-bold tracking-widest uppercase text-zinc-400">
+                <Key size={13} className="text-zinc-500" />
+                <span>Developer Lock</span>
+              </div>
+            ) : (
+              <RoleMenuDropdown
+                role={u.role || "admin"}
+                onSave={(newRole) => onRoleChange(u.id, newRole)}
+              />
+            )}
+          </div>
+
+          {/* Card Bottom Section: Status Pill & Last Login */}
+          <div className="px-5 sm:px-6 py-3.5 bg-black/70 border-t border-white/[0.06] flex items-center justify-between">
+            <div
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                u.is_active !== false
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                  : "bg-red-500/10 border-red-500/20 text-red-400"
+              }`}>
               <span
-                className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${
-                  u.is_active !== false ? "text-white" : "text-red-600"
-                }`}>
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    u.is_active !== false
-                      ? "bg-white shadow-sm text-black"
-                      : "bg-red-600"
-                  }`}
-                />
-                {u.is_active !== false ? "Active" : "Suspended"}
-              </span>
-              <span
-                className="text-[10px] text-zinc-400 font-mono tracking-widest uppercase inline-flex items-center gap-1"
-                title={
-                  getLatestSessionTime(u)
-                    ? new Date(getLatestSessionTime(u)).toLocaleString()
-                    : "No entry"
-                }>
-                <Clock size={10} className="text-zinc-500 shrink-0" />
-                Last Login: {formatLastSeen(getLatestSessionTime(u))}
-              </span>
+                className={`w-1.5 h-1.5 rounded-full ${
+                  u.is_active !== false
+                    ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse"
+                    : "bg-red-500"
+                }`}
+              />
+              {u.is_active !== false ? "Active" : "Suspended"}
             </div>
+
+            <span
+              className="text-[10px] text-zinc-500 font-mono tracking-wider uppercase inline-flex items-center gap-1"
+              title={
+                getLatestSessionTime(u)
+                  ? new Date(getLatestSessionTime(u)).toLocaleString()
+                  : "No entry"
+              }>
+              <Clock size={10} className="text-zinc-600 shrink-0" />
+              {formatLastSeen(getLatestSessionTime(u))}
+            </span>
           </div>
         </div>
       ))}
       {users.length === 0 && (
-        <div className="col-span-full py-20 text-center text-zinc-600 text-sm font-bold tracking-widest uppercase border border-white/[0.06]  rounded-2xl bg-zinc-950">
+        <div className="col-span-full py-20 text-center text-zinc-600 text-sm font-bold tracking-widest uppercase border border-white/[0.06] rounded-3xl bg-zinc-950">
           No identities found.
         </div>
       )}

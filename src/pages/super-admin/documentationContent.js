@@ -533,15 +533,39 @@ Themes are applied via **CSS custom properties** on \`:root\`:
 - **Session refresh**: On each page load, syncs with latest DB record
 - **Session structure**: \`{ id, name, role, indexNumber, email, avatarUrl, expiresAt, rememberMe }\`
 
-### 11.3 Role-Based Access Control
+### 11.3 Role-Based Access Control & Security Matrix
 
-[roles.js](file:///c:/Users/User/Documents/DEV%20PROJECTS/icmu-web/icmu-web/src/lib/roles.js) defines 4 roles:
+The system implements a multi-role clearance architecture defined in \`src/utils/roles.js\`. Roles can be assigned as single clearances or authorized combinations (such as \`admin,broadcaster\`).
 
-| Role | News | Team | Users | Messages | Assets | Schools | Registrations |
-|------|------|------|-------|----------|--------|---------|---------------|
-| **super-admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **admin** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **writer** | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+#### 1. The 4 Operational Dashboards
+
+| Dashboard Panel | Route Path | Authorized Roles | Access Scope |
+|-----------------|------------|-------------------|--------------|
+| **Super Admin Hub** | \`/:adminPath\` | \`super-admin\` | Unrestricted master terminal for user management, system database telemetry, and documentation. |
+| **Main Admin Dashboard** | \`/:adminPath/dashboard\` | \`admin\`, \`admin,broadcaster\`, \`super-admin\` | Global content administration (newsroom, messages, team management, site configurations). |
+| **Broadcaster Terminal** | \`/:adminPath/broadcast\` | \`broadcaster\`, \`admin,broadcaster\`, \`super-admin\` | Live broadcasting operations terminal, stream telemetry, encoder ingest controls. |
+| **Writer Newsroom** | \`/:adminPath/dashboard/news\` | \`writer\`, \`admin\`, \`super-admin\` | Restricted authoring environment for articles and publication drafts. |
+
+#### 2. Clearance Tiers & Combination Rules
+
+| Clearance Level | Stored Value | Combination Allowed? | Rule Enforcement |
+|-----------------|--------------|----------------------|------------------|
+| **Super Admin** | \`"super-admin"\` | ❌ None (Solo) | Master clearance across all 4 dashboards. Selecting Super Admin disables all other role selections. |
+| **Admin** | \`"admin"\` | ✅ \`+ Broadcaster\` | Portal administration. Can optionally be granted dual clearance with Broadcaster (\`"admin,broadcaster"\`). |
+| **Broadcaster** | \`"broadcaster"\` | ✅ \`+ Admin\` | Broadcasting operations panel. Can optionally be granted dual clearance with Admin (\`"admin,broadcaster"\`). |
+| **Admin + Broadcaster** | \`"admin,broadcaster"\` | Dual Clearance | Simultaneous access to both the Main Admin Dashboard and the Broadcasting Terminal. |
+| **Writer** | \`"writer"\` | ❌ None (Solo) | Isolated strictly to Newsroom and Article drafts. Selecting Writer disables all other selections. |
+
+#### 3. Security Guidelines & Leak Prevention
+
+- **Single Column Storage**: Multi-role assignments are stored as comma-separated values in the existing \`users.role\` column, avoiding breaking database schema changes.
+- **Hierarchical Layout Guards**:
+  - \`ProtectedRoute.jsx\`: Validates session validity and ensures \`user.indexNumber === URL adminPath\`.
+  - \`SuperAdminLayout.jsx\`: Verifies \`canAccessHub(role)\`. Non-super-admins with dual clearance see the 2-card launcher. Unauthorized users are safely redirected.
+  - \`AdminLayout.jsx\`: Verifies \`canAccessAdminDashboard(role)\` and strictly restricts standalone writers from accessing system settings, live stream controls, team management, and messages.
+  - \`BroadcasterLayout.jsx\`: Verifies \`canAccessBroadcastDashboard(role)\` with explicit access denial and return paths.
+- **Dynamic Post-Login Redirection**: \`getDefaultDashboardPath(role, index)\` routes each identity to their primary terminal (\`/\` for Super Admin and Dual Operators, \`/dashboard\` for Admin/Writer, \`/broadcast\` for Broadcaster).
+- **Developer Lock System**: Hardcoded developer accounts (\`24929\`, \`25473\`) are locked from privilege modifications in both the UI and management APIs.
 
 
 ### 11.4 Route-Level Protection

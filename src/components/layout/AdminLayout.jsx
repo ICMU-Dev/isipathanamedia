@@ -14,6 +14,12 @@ import MaintenanceBanner from "./MaintenanceBanner";
 import FeedbackWidget from "../admin/FeedbackWidget";
 import PWAInstallModal from "../admin/PWAInstallModal";
 import Loader from "../ui/Loader";
+import {
+  canAccessAdminDashboard,
+  isAdmin as checkIsAdmin,
+  isWriter as checkIsWriter,
+  getDefaultDashboardPath,
+} from "../../utils/roles";
 
 const AdminLayout = () => {
   const { user } = useAuth();
@@ -29,11 +35,9 @@ const AdminLayout = () => {
     }
   });
 
-  const role = user?.role?.toLowerCase();
-  const isSuperAdmin =
-    role === "super-admin" || role === "superadmin" || role === "super_admin";
-  const isAdmin = role === "admin";
-  const isWriter = role === "writer";
+  const role = user?.role;
+  const hasAdminDashboardAccess = canAccessAdminDashboard(role);
+  const isWriterOnly = checkIsWriter(role) && !checkIsAdmin(role);
 
   // Scroll to top on route change
   useEffect(() => {
@@ -58,9 +62,9 @@ const AdminLayout = () => {
     });
   };
 
-  // Restrict access if not admin or writer
-  if (!isSuperAdmin && !isAdmin && !isWriter) {
-    const returnPath = "/";
+  // Restrict access if not authorized for admin dashboard
+  if (!hasAdminDashboardAccess) {
+    const returnPath = getDefaultDashboardPath(role, adminPath);
     return (
       <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-[color:var(--admin-bg)] text-center px-4 animate-fade-in">
         <ShieldAlert
@@ -85,7 +89,7 @@ const AdminLayout = () => {
   }
 
   // Strict Route Guard for Writers
-  if (isWriter) {
+  if (isWriterOnly) {
     const allowedWriterPaths = [
       `/${adminPath}/dashboard`,
       `/${adminPath}/dashboard/news`,

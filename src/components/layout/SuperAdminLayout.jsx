@@ -5,13 +5,14 @@ import { NotificationProvider } from "../../context/NotificationContext";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
 import MaintenanceBanner from "./MaintenanceBanner";
 import Loader from "../ui/Loader";
+import { canAccessHub, getDefaultDashboardPath } from "../../utils/roles";
 
 const SuperAdminLayout = () => {
   const { user } = useAuth();
   const { adminPath } = useParams();
   const location = useLocation();
-  const role = user?.role?.toLowerCase();
-  const isSuperAdmin = role === "super-admin" || role === "superadmin";
+  const role = user?.role;
+  const isAuthorized = canAccessHub(role);
 
   // Scroll to top on route change
   useEffect(() => {
@@ -21,9 +22,9 @@ const SuperAdminLayout = () => {
     });
   }, [location.pathname]);
 
-  if (!isSuperAdmin) {
+  if (!isAuthorized) {
     // Determine where to send them back based on their actual role
-    const returnPath = `/${adminPath}/dashboard`;
+    const returnPath = getDefaultDashboardPath(role, adminPath);
 
     return (
       <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-ambient text-center px-4">
@@ -35,7 +36,7 @@ const SuperAdminLayout = () => {
           Unauthorized Clearance
         </h2>
         <p className="text-white/70 text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] mb-8 max-w-md">
-          Target destination requires Super Administrator privileges. Your
+          Target destination requires Super Administrator or Dual Operator privileges. Your
           current role [{role || "unknown"}] is insufficient.
         </p>
         <Link

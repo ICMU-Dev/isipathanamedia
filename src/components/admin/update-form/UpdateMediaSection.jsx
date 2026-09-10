@@ -22,14 +22,14 @@ const UpdateMediaSection = ({
             className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl group-hover:opacity-40 transition-opacity duration-300"
           />
           {canEditMetadata && (
-            <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex-wrap p-2">
+            <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300 flex-wrap p-2 bg-black/40 sm:bg-transparent sm:group-hover:bg-black/40">
               <button
                 type="button"
                 onClick={() => {
                   setImageToCrop(formData.image);
                   setCropModalOpen(true);
                 }}
-                disabled={saving}
+                disabled={saving || uploading}
                 className="bg-black/90 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border border-[var(--admin-border)] cursor-pointer hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)] transition-all shadow-xl disabled:opacity-50 text-white"
               >
                 <Crop size={14} /> Crop

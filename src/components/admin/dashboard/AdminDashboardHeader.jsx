@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import MainLogos from "../../../assets/main-logos.png";
 import ActiveAdmins from "../../layout/ActiveAdmins";
+import { canAccessHub } from "../../../utils/roles";
 
 const AdminDashboardHeader = ({ user, basePath }) => {
+  const hasHubAccess = canAccessHub(user?.role);
   return (
     <>
       {/* Top Header Section - Desktop */}
@@ -36,7 +38,7 @@ const AdminDashboardHeader = ({ user, basePath }) => {
         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent)] rounded-full blur-[80px] opacity-15 -translate-y-1/2 translate-x-1/3 -z-10 pointer-events-none" />
 
         <div className="flex flex-col items-start justify-between gap-1">
-          {user?.role?.toLowerCase().includes("super") ? (
+          {hasHubAccess ? (
             <Link to={basePath}>
               <img
                 src={MainLogos}

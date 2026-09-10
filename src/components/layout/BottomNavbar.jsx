@@ -58,19 +58,27 @@ const BottomNavbar = () => {
   const hasBroadcasterAccess = canAccessBroadcastDashboard(role);
 
   const { news } = useData();
-  const { notifications, markAllMessagesAsRead } = useNotification();
+  const {
+    notifications,
+    markAllMessagesAsRead,
+    markAllFeedbacksAsRead,
+    unreadFeedbacksCount,
+    unreadMessagesCount,
+  } = useNotification();
 
   const pendingCount = news?.filter((n) => n.status === "pending").length || 0;
   const showNewsBadge = isAdm && pendingCount > 0;
 
   const unreadFeedbacks =
-    notifications?.filter((n) => (n.isFeedback || n.category === "feedback") && !n.read).length || 0;
+    unreadFeedbacksCount ??
+    (notifications?.filter((n) => (n.isFeedback || n.category === "feedback") && !n.read).length || 0);
   const unreadMessages =
-    notifications?.filter((n) => (n.isInbox || n.category === "inbox") && !n.read).length || 0;
-
+    unreadMessagesCount ??
+    (notifications?.filter((n) => (n.isInbox || n.category === "inbox") && !n.read).length || 0);
 
   const { isStandalone, isInstallable, promptInstall } = usePWAInstall();
   const showSettingsBadge = isAdm && unreadFeedbacks > 0;
+
   // Auto-clear message notifications when visiting the Chat tab
   useEffect(() => {
     if (location.pathname === `${basePath}/dashboard/messages`) {
@@ -85,6 +93,26 @@ const BottomNavbar = () => {
     notifications,
     markAllMessagesAsRead,
   ]);
+
+  // Auto-clear feedback notifications when visiting settings#feedbacks or /feedbacks
+  useEffect(() => {
+    const isFeedbackView =
+      (location.pathname === `${basePath}/dashboard/settings` && location.hash === "#feedbacks") ||
+      location.pathname === `${basePath}/dashboard/feedbacks`;
+    if (isFeedbackView) {
+      if (unreadFeedbacks > 0 && notifications?.length > 0) {
+        if (markAllFeedbacksAsRead) markAllFeedbacksAsRead();
+      }
+    }
+  }, [
+    location.pathname,
+    location.hash,
+    basePath,
+    unreadFeedbacks,
+    notifications,
+    markAllFeedbacksAsRead,
+  ]);
+
 
   const allNavItems = [
     {

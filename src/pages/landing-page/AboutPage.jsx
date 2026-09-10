@@ -104,7 +104,11 @@ const SectionHeader = ({ subtitle, title, titleAccent }) => (
 
 const AboutPage = () => {
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    if (window.lenis) {
+      window.lenis.scrollTo(0, { immediate: true });
+      window.lenis.resize();
+    }
 
     const ctx = gsap.context(() => {
       gsap.from(".reveal-text", {

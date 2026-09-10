@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-09-10
+
+Fixed some minor issues with Admin + Broadcaster Role, Updates caption bugs and Data Fetching issues.
+
+### Highlights
+- **Upgraded to Tanstack v5**: Better invalidated Latest Data Fetching With cache handling
+- **Live Stream Issues  Fixed**: Issues with Role Broadcaster fixed in RLS Polices
+- **Improved Notifications & Indicators**: Backward Compatibility added to messages and Feedbacks notificaitons
+- **"Updates" related issues fixed**: Fixed the known issues of Captions fetching
+- **New minor improvements added**: Now Articles shows up to 10 in Public Page and added show more button to news section
+- **SEO Improvements**: Improved OG Links to show dynamic content based on articles
+
 ## [2.0.0] - 2026-09-10
 
 ICMU Web platform featuring the all-new V2 design system, a real-time notification hub, masonry article galleries, privacy-first GA4 analytics, blazing-fast data caching, and a zero-leak edge security architecture.

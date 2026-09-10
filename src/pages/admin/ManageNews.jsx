@@ -129,12 +129,15 @@ const ManageNews = () => {
   // Quick View State
   const [viewingArticle, setViewingArticle] = useState(null);
   const [modalView, setModalView] = useState("options");
+  const [previewTab, setPreviewTab] = useState("article"); // "article" | "analytics"
   const [copiedLink, setCopiedLink] = useState(false);
+  const [articleViewsMap, setArticleViewsMap] = useState({});
   const closedHashRef = useRef(null);
 
   const handleCloseModal = () => {
     closedHashRef.current = location.hash;
     setViewingArticle(null);
+    setPreviewTab("article");
     setTimeout(() => setModalView("options"), 300);
     if (location.hash?.startsWith("#view-") || location.hash?.startsWith("#article-")) {
       navigate({ hash: activeTab }, { replace: true });
@@ -190,7 +193,14 @@ const ManageNews = () => {
 
   useEffect(() => {
     if (modalView === 'view' && viewingArticle?.id && viewingArticle.type !== 'update') {
-      fetchAnalytics(viewingArticle.id);
+      fetchAnalytics(viewingArticle.id).then((res) => {
+        if (res?.views !== undefined) {
+          setArticleViewsMap((prev) => ({
+            ...prev,
+            [viewingArticle.id]: res.views,
+          }));
+        }
+      });
     }
     return () => clearAnalytics();
   }, [modalView, viewingArticle?.id, viewingArticle?.type, fetchAnalytics, clearAnalytics]);
@@ -743,6 +753,7 @@ const ManageNews = () => {
           handleEdit={handleEdit}
           handleReject={handleNeedsAttentionOpen}
           handleDelete={handleDelete}
+          viewsMap={articleViewsMap}
         />
       ) : viewMode === "board" ? (
         <NewsBoardView
@@ -781,6 +792,7 @@ const ManageNews = () => {
           handleEdit={handleEdit}
           handleReject={handleNeedsAttentionOpen}
           handleDelete={handleDelete}
+          viewsMap={articleViewsMap}
         />
       )}
 
@@ -1050,7 +1062,7 @@ const ManageNews = () => {
                   <span className="hidden sm:inline">Back</span>
                 </button>
                 <div className="text-xs font-bold text-[var(--admin-text-secondary)] uppercase tracking-widest">
-                  Article Preview
+                  {viewingArticle.type === "update" ? "Update Preview" : "Article Preview"}
                 </div>
                 <button
                   type="button"
@@ -1061,201 +1073,55 @@ const ManageNews = () => {
                 </button>
               </div>
 
-              {/* Side-by-side on PC (sm:flex-row), Flowing layout on Mobile */}
-              <div className="flex flex-col sm:flex-row gap-5 p-1 sm:p-2 max-h-[75vh] sm:max-h-[80vh] overflow-y-auto custom-scrollbar">
-                {/* Left Column: Cover Image & Analytics Card */}
-                <div className="flex flex-col gap-3.5 sm:w-[380px] lg:w-[420px] shrink-0 order-2 sm:order-1">
-                  {/* Cover Image (Desktop) */}
-                  {(viewingArticle.image || viewingArticle.image_url) ? (
-                    <div className={`hidden sm:block w-full rounded-2xl overflow-hidden relative bg-black/40 border border-white/[0.08] shadow-md shrink-0 ${viewingArticle.type === 'update' ? '' : 'aspect-video'}`}>
-                      <ImageWithLoader
-                        src={viewingArticle.image || viewingArticle.image_url}
-                        alt={viewingArticle.title}
-                        fallbackIconClassName="w-12 h-12 opacity-20 object-contain grayscale"
-                        imageClassName={`w-full h-full opacity-90 transition-transform duration-500 ${viewingArticle.type === 'update' ? 'object-contain' : 'object-cover'}`}
-                      />
-                    </div>
-                  ) : null}
-
-                  {/* Analytics & Performance Card */}
-                  {viewingArticle?.type !== 'update' && (
-                  <div className={`bg-[#0c0c0e]/20 border border-white/[0.08] rounded-2xl p-4 flex flex-col gap-3.5 shadow-sm ${analyticsLoading ? 'animate-pulse' : ''}`}>
-                    {/* Header */}
-                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
-                      <div className="flex items-center gap-2">
-                        <BarChart2 size={15} className="text-theme-accent" />
-                        <span className="text-xs font-bold uppercase tracking-wider text-white/90">
-                          Performance & Metrics
+              {/* Sub-tab Switcher: Article vs Analytics (for articles only) */}
+              {viewingArticle.type !== "update" && (
+                <div className="flex items-center justify-center my-1 shrink-0">
+                  <div className="inline-flex p-1 bg-[var(--admin-input-bg)] border border-[var(--admin-border)] rounded-2xl gap-1 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab("article")}
+                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                        previewTab === "article"
+                          ? "bg-white text-black shadow-sm font-bold"
+                          : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text-primary)]"
+                      }`}
+                    >
+                      <FileText size={13} />
+                      <span>Article</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab("analytics")}
+                      className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                        previewTab === "analytics"
+                          ? "bg-white text-black shadow-sm font-bold"
+                          : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text-primary)]"
+                      }`}
+                    >
+                      <BarChart2 size={13} />
+                      <span>Analytics</span>
+                      {analytics?.views !== undefined && (
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                            previewTab === "analytics"
+                              ? "bg-black/10 text-black"
+                              : "bg-white/10 text-white/70"
+                          }`}
+                        >
+                          {analytics.views}
                         </span>
-                      </div>
-                      <span className="text-[9px] bg-theme-accent/10 text-theme-accent font-mono font-bold px-2 py-0.5 rounded-full border border-theme-accent/20">
-                        LIVE
-                      </span>
-                    </div>
-
-                    {analytics?.configured === false && (
-                      <div className="flex items-center gap-2 p-2 rounded-xl  bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-medium">
-                        <span>GA4 credentials not configured. Analytics data will appear once connected.</span>
-                      </div>
-                    )}
-
-                    {/* 2x2 Stats Grid */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {/* Views */}
-                      <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
-                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
-                          <Eye size={12} className="text-white/40" /> Total Views
-                        </span>
-                        <div className="flex items-baseline justify-between mt-1">
-                          <span className="text-base font-mono font-bold text-white">
-                            {analytics?.views ?? 0}
-                          </span>
-                          {analytics?.configured === false ? (
-                            <span className="text-[9px] text-amber-400 font-mono font-bold">Setup GA4</span>
-                          ) : (
-                            <span className="text-[9px] text-emerald-400 font-mono font-bold flex items-center gap-0.5">
-                              <TrendingUp size={10} /> {analytics?.users ?? 0} users
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Reading Time */}
-                      <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
-                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
-                          <Clock size={12} className="text-white/40" /> Read Time
-                        </span>
-                        <div className="flex items-baseline justify-between mt-1">
-                          <span className="text-base font-mono font-bold text-white">
-                            ~{Math.max(1, Math.ceil((viewingArticle.content || "").replace(/<[^>]*>?/gm, "").split(/\s+/).filter(Boolean).length / 180))}m
-                          </span>
-                          <span className="text-[9px] text-white/40 font-mono">
-                            {(viewingArticle.content || "").replace(/<[^>]*>?/gm, "").split(/\s+/).filter(Boolean).length}w
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Visibility Status */}
-                      <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
-                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
-                          <Globe size={12} className="text-white/40" /> Visibility
-                        </span>
-                        <span className="text-xs font-bold text-white uppercase tracking-wider mt-1.5 flex items-center gap-1">
-                          {viewingArticle.visibility === "private" ? (
-                            <span className="text-rose-400 flex items-center gap-1">
-                              <EyeOff size={11} /> Private
-                            </span>
-                          ) : viewingArticle.visibility === "unlisted" ? (
-                            <span className="text-purple-400 flex items-center gap-1">
-                              <LinkIcon size={11} /> Unlisted
-                            </span>
-                          ) : (
-                            <span className="text-emerald-400 flex items-center gap-1">
-                              <Globe size={11} /> Public
-                            </span>
-                          )}
-                        </span>
-                      </div>
-
-                      {/* Publishing Status */}
-                      <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
-                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
-                          <CheckCircle size={12} className="text-white/40" /> Status
-                        </span>
-                        <span className="text-xs font-bold text-white uppercase tracking-wider mt-1.5 flex items-center gap-1">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              viewingArticle.status === "published"
-                                ? "bg-emerald-400"
-                                : viewingArticle.status === "pending"
-                                ? "bg-blue-400 animate-pulse"
-                                : "bg-yellow-400"
-                            }`}
-                          />
-                          {viewingArticle.status || "Draft"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Audience & Device Distribution */}
-                    <div className="flex flex-col gap-1.5 pt-1">
-                      <div className="flex items-center justify-between text-[10px] text-white/45">
-                        <span>Device Distribution</span>
-                        <span className="font-mono">
-                          {(() => {
-                            const d = analytics?.deviceBreakdown || { mobile: 0, desktop: 0, tablet: 0 };
-                            const total = d.mobile + d.desktop + d.tablet || 1;
-                            return `Mobile ${Math.round(d.mobile / total * 100)}% • Desktop ${Math.round(d.desktop / total * 100)}%`;
-                          })()}
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden flex">
-                        {(() => {
-                          const d = analytics?.deviceBreakdown || { mobile: 0, desktop: 0, tablet: 0 };
-                          const total = d.mobile + d.desktop + d.tablet || 1;
-                          return (
-                            <>
-                              <div className="bg-theme-accent h-full" style={{ width: `${Math.round(d.mobile / total * 100)}%` }} />
-                              <div className="bg-blue-500 h-full" style={{ width: `${Math.round(d.desktop / total * 100)}%` }} />
-                              <div className="bg-purple-500 h-full" style={{ width: `${Math.round(d.tablet / total * 100)}%` }} />
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <div className="flex items-center gap-3 text-[9px] text-white/40 mt-0.5">
-                        <span className="flex items-center gap-1">
-                          <Smartphone size={10} className="text-theme-accent" /> Mobile
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Laptop size={10} className="text-blue-400" /> Desktop
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Quick Link Tools */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-white/[0.06]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!viewingArticle?.id) return;
-                          const url = `${window.location.origin}/news/${viewingArticle.id}`;
-                          navigator.clipboard.writeText(url);
-                          setCopiedLink(true);
-                          toast.success("Public link copied to clipboard!");
-                          setTimeout(() => setCopiedLink(false), 2000);
-                        }}
-                        className="flex-1 py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white border border-white/[0.06] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                      >
-                        {copiedLink ? (
-                          <>
-                            <Check size={13} className="text-theme-accent" /> Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} /> Copy Link
-                          </>
-                        )}
-                      </button>
-
-                      <a
-                        href={viewingArticle?.id ? `/news/${viewingArticle.id}` : "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white border border-white/[0.06] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                        title="Open in Public View"
-                      >
-                        <ExternalLink size={13} />
-                      </a>
-                    </div>
+                      )}
+                    </button>
                   </div>
-                  )}
                 </div>
+              )}
 
-                {/* Right Column: Full Article Content Reader */}
-                <div className="flex flex-col justify-between flex-1 min-w-0 gap-4 order-1 sm:order-2">
-                  {/* Cover Image (Mobile Only - positioned at top so mobile users always see it) */}
+              {/* TAB 1: Article Content View */}
+              {(viewingArticle.type === "update" || previewTab === "article") && (
+                <div className="flex flex-col gap-4 p-1 sm:p-2 max-h-[75vh] sm:max-h-[80vh] overflow-y-auto custom-scrollbar">
+                  {/* Cover Image */}
                   {(viewingArticle.image || viewingArticle.image_url) ? (
-                    <div className={`block sm:hidden w-full rounded-2xl overflow-hidden relative bg-black/40 border border-white/[0.08] shadow-md shrink-0 ${viewingArticle.type === 'update' ? '' : 'aspect-video'}`}>
+                    <div className={`w-full rounded-2xl overflow-hidden relative bg-black/40 border border-white/[0.08] shadow-md shrink-0 ${viewingArticle.type === 'update' ? '' : 'aspect-video max-h-[260px]'}`}>
                       <ImageWithLoader
                         src={viewingArticle.image || viewingArticle.image_url}
                         alt={viewingArticle.title}
@@ -1268,7 +1134,7 @@ const ManageNews = () => {
                   <div className="space-y-3.5">
                     {/* Tags & Metadata */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-white/[0.06] text-white/90 border border-white/[0.08] px-2.5 py-0.5 rounded-3xl  text-[10px] font-bold uppercase tracking-wider">
+                      <span className="bg-white/[0.06] text-white/90 border border-white/[0.08] px-2.5 py-0.5 rounded-3xl text-[10px] font-bold uppercase tracking-wider">
                         {viewingArticle.category || "General"}
                       </span>
                       <span className="text-[11px] text-white/40 font-mono">
@@ -1280,7 +1146,7 @@ const ManageNews = () => {
                       </span>
                     </div>
 
-                    <h2 className="text-lg sm:text-2xl font-bold text-white leading-snug">
+                    <h2 className="text-md sm:text-2xl font-bold text-white leading-snug">
                       {viewingArticle.title}
                     </h2>
 
@@ -1299,7 +1165,7 @@ const ManageNews = () => {
                         : "U";
 
                       return (
-                        <div className="flex items-center gap-2.5 py-2 px-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-white/70">
+                        <div className="flex items-center gap-2.5 py-1 px-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-white/70">
                           {isArticle ? (
                             isICMU ? (
                               <>
@@ -1397,7 +1263,7 @@ const ManageNews = () => {
                     )}
 
                     {/* Content Reader */}
-                    <div className="text-xs sm:text-sm text-white/75 leading-relaxed prose prose-invert prose-sm max-w-none max-h-[35vh] sm:max-h-[42vh] overflow-y-auto custom-scrollbar pr-1 pt-1">
+                    <div className="text-xs sm:text-sm text-white/75 leading-relaxed prose prose-invert prose-sm max-w-none max-h-[30vh] overflow-y-auto custom-scrollbar pr-1 pt-1">
                       <div
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(viewingArticle.content || "") }}
                       />
@@ -1418,6 +1284,7 @@ const ManageNews = () => {
                     >
                       Back to Options
                     </button>
+                   
                     {(isAdmin || viewingArticle.status === "draft" || viewingArticle.needs_attention) && (
                       <button
                         type="button"
@@ -1433,7 +1300,239 @@ const ManageNews = () => {
                     )}
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* TAB 2: Analytics & Metrics View */}
+              {viewingArticle.type !== "update" && previewTab === "analytics" && (
+                <div className="flex flex-col gap-4 p-1 sm:p-2 max-h-[75vh] sm:max-h-[80vh] overflow-y-auto custom-scrollbar">
+                  {/* Article Mini Header */}
+                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                    {(viewingArticle.image || viewingArticle.image_url) ? (
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-black/40 border border-white/[0.08] shrink-0">
+                        <img
+                          src={viewingArticle.image || viewingArticle.image_url}
+                          alt={viewingArticle.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="bg-white/[0.06] text-white/80 border border-white/[0.08] px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider">
+                          {viewingArticle.category || "General"}
+                        </span>
+                        <span className="text-[10px] text-white/40 font-mono">
+                          {new Date(viewingArticle.date).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-white truncate">
+                        {viewingArticle.title}
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Analytics & Performance Card */}
+                  <div className={`bg-[#0c0c0e]/40 border border-white/[0.08] rounded-2xl p-4 flex flex-col gap-3.5 shadow-sm ${analyticsLoading ? 'animate-pulse' : ''}`}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+                      <div className="flex items-center gap-2">
+                        <BarChart2 size={15} className="text-theme-accent" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-white/90">
+                          Performance & Metrics
+                        </span>
+                      </div>
+                      <span className="text-[9px] bg-theme-accent/10 text-theme-accent font-mono font-bold px-2 py-0.5 rounded-full border border-theme-accent/20">
+                        LIVE
+                      </span>
+                    </div>
+
+                    {analytics?.configured === false && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+                        <AlertCircle size={14} className="shrink-0" />
+                        <span>GA4 credentials not configured. Analytics data will appear once connected.</span>
+                      </div>
+                    )}
+
+                    {/* 2x2 Stats Grid */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {/* Views */}
+                      <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
+                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
+                          <Eye size={12} className="text-white/40" /> Total Views
+                        </span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-lg font-mono font-bold text-white">
+                            {analytics?.views ?? 0}
+                          </span>
+                          {analytics?.configured === false ? (
+                            <span className="text-[9px] text-amber-400 font-mono font-bold">Setup GA4</span>
+                          ) : (
+                            <span className="text-[9px] text-emerald-400 font-mono font-bold flex items-center gap-0.5">
+                              <TrendingUp size={10} /> {analytics?.users ?? 0} users
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Reading Time */}
+                      <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
+                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
+                          <Clock size={12} className="text-white/40" /> Read Time
+                        </span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-lg font-mono font-bold text-white">
+                            ~{Math.max(1, Math.ceil((viewingArticle.content || "").replace(/<[^>]*>?/gm, "").split(/\s+/).filter(Boolean).length / 180))}m
+                          </span>
+                          <span className="text-[9px] text-white/40 font-mono">
+                            {(viewingArticle.content || "").replace(/<[^>]*>?/gm, "").split(/\s+/).filter(Boolean).length}w
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Visibility Status */}
+                      <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
+                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
+                          <Globe size={12} className="text-white/40" /> Visibility
+                        </span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider mt-1.5 flex items-center gap-1">
+                          {viewingArticle.visibility === "private" ? (
+                            <span className="text-rose-400 flex items-center gap-1">
+                              <EyeOff size={11} /> Private
+                            </span>
+                          ) : viewingArticle.visibility === "unlisted" ? (
+                            <span className="text-purple-400 flex items-center gap-1">
+                              <LinkIcon size={11} /> Unlisted
+                            </span>
+                          ) : (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              <Globe size={11} /> Public
+                            </span>
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Publishing Status */}
+                      <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col">
+                        <span className="text-[10px] text-white/45 font-medium flex items-center gap-1">
+                          <CheckCircle size={12} className="text-white/40" /> Status
+                        </span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider mt-1.5 flex items-center gap-1">
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              viewingArticle.status === "published"
+                                ? "bg-emerald-400"
+                                : viewingArticle.status === "pending"
+                                ? "bg-blue-400 animate-pulse"
+                                : "bg-yellow-400"
+                            }`}
+                          />
+                          {viewingArticle.status || "Draft"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Audience & Device Distribution */}
+                    <div className="flex flex-col gap-2 pt-1">
+                      <div className="flex items-center justify-between text-[10px] text-white/45">
+                        <span>Device Distribution</span>
+                        <span className="font-mono">
+                          {(() => {
+                            const d = analytics?.deviceBreakdown || { mobile: 0, desktop: 0, tablet: 0 };
+                            const total = d.mobile + d.desktop + d.tablet || 1;
+                            return `Mobile ${Math.round(d.mobile / total * 100)}% • Desktop ${Math.round(d.desktop / total * 100)}%`;
+                          })()}
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden flex">
+                        {(() => {
+                          const d = analytics?.deviceBreakdown || { mobile: 0, desktop: 0, tablet: 0 };
+                          const total = d.mobile + d.desktop + d.tablet || 1;
+                          return (
+                            <>
+                              <div className="bg-theme-accent h-full" style={{ width: `${Math.round(d.mobile / total * 100)}%` }} />
+                              <div className="bg-blue-500 h-full" style={{ width: `${Math.round(d.desktop / total * 100)}%` }} />
+                              <div className="bg-purple-500 h-full" style={{ width: `${Math.round(d.tablet / total * 100)}%` }} />
+                            </>
+                          );
+                        })()}
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-white/40 mt-0.5">
+                        <span className="flex items-center gap-1">
+                          <Smartphone size={11} className="text-theme-accent" /> Mobile
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Laptop size={11} className="text-blue-400" /> Desktop
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Link Tools */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-white/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!viewingArticle?.id) return;
+                          const url = `${window.location.origin}/news/${viewingArticle.id}`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedLink(true);
+                          toast.success("Public link copied to clipboard!");
+                          setTimeout(() => setCopiedLink(false), 2000);
+                        }}
+                        className="flex-1 py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white border border-white/[0.06] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        {copiedLink ? (
+                          <>
+                            <Check size={13} className="text-theme-accent" /> Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} /> Copy Link
+                          </>
+                        )}
+                      </button>
+
+                      <a
+                        href={viewingArticle?.id ? `/news/${viewingArticle.id}` : "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white border border-white/[0.06] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                        title="Open in Public View"
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div className="pt-3 border-t border-[var(--admin-border)] flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab("article")}
+                      className="flex-1 py-2.5 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/40 border border-[var(--admin-border)] text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <FileText size={13} />
+                      <span>Back to Article</span>
+                    </button>
+                    {(isAdmin || viewingArticle.status === "draft" || viewingArticle.needs_attention) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseModal();
+                          handleEdit(viewingArticle.id);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-theme-accent text-black hover:opacity-90 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Edit2 size={13} />
+                        <span>Edit Article</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

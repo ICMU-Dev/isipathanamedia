@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
+import { isSuperAdmin as checkIsSuperAdmin } from "../../utils/roles";
 import { toast } from "sonner";
 
 const formatMessageDate = (timestamp) => {
@@ -54,7 +55,7 @@ const formatExactDateTime = (timestamp) => {
 
 const AdminMessages = () => {
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === "super-admin" || user?.role === "superadmin" || user?.role === "super_admin";
+  const isSuperAdmin = checkIsSuperAdmin(user?.role);
   const { messages, deleteMessage, addActivityLog, fetchMessages } = useData();
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyContent, setReplyContent] = useState("");
@@ -62,14 +63,20 @@ const AdminMessages = () => {
 
   useEffect(() => {
     if (fetchMessages) {
-      fetchMessages();
+      fetchMessages(true);
     }
   }, [fetchMessages]);
 
   const handleDelete = async (id) => {
+    if (!id) return;
     if (window.confirm("Are you sure you want to delete this message?")) {
-      await deleteMessage(id);
-      toast.success("Message deleted.");
+      try {
+        await deleteMessage(id);
+        toast.success("Message deleted.");
+      } catch (err) {
+        console.error("Failed to delete message:", err);
+        toast.error(err?.message || "Failed to delete message");
+      }
     }
   };
 
@@ -122,10 +129,16 @@ const AdminMessages = () => {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--admin-border)] border border-theme-base text-xs font-semibold text-theme-primary opacity-70">
+        <button
+          onClick={() => {
+            if (fetchMessages) fetchMessages(true);
+            toast.info("Inbox refreshed");
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--admin-border)] border border-theme-base text-xs font-semibold text-theme-primary opacity-70 hover:opacity-100 hover:bg-white/10 transition-all cursor-pointer"
+          title="Click to refresh inbox">
           <Inbox size={14} />
-          <span>All Messages</span>
-        </div>
+          <span>Refresh Inbox</span>
+        </button>
       </div>
 
       {/* Messages List */}

@@ -6,6 +6,7 @@ import { AnimatedBadge } from "../../components/motion/animated-badge";
 import {
   canAccessAdminDashboard,
   canAccessSuperAdminDashboard,
+  canAccessHub,
   getRoleLabel,
   getBroadcasterAdminUrl,
   getBroadcasterBaseUrl,
@@ -19,6 +20,7 @@ const BroadcasterDashboard = () => {
   const basePath = `/${adminPath}`;
   const hasAdminAccess = canAccessAdminDashboard(user?.role);
   const hasSuperAdminAccess = canAccessSuperAdminDashboard(user?.role);
+  const hasHubAccess = canAccessHub(user?.role);
 
   const targetUrl = getBroadcasterAdminUrl(adminPath || user?.indexNumber, user);
 
@@ -65,12 +67,12 @@ const BroadcasterDashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {hasSuperAdminAccess && (
+            {hasHubAccess && (
               <Link
                 to={basePath}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-xs font-bold transition-all border border-white/10">
                 <ShieldCheck size={14} />
-                <span className="hidden sm:inline">Super Admin</span>
+                <span className="hidden sm:inline">{hasSuperAdminAccess ? "Super Admin" : "Hub"}</span>
               </Link>
             )}
 

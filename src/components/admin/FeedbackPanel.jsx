@@ -23,11 +23,17 @@ import {
   ShieldCheck,
   CalendarDays,
   Link as LinkIcon,
+  ExternalLink,
   TrendingUp,
   Copy,
 } from "lucide-react";
+import { isSuperAdmin as checkIsSuperAdmin, isAdmin as checkIsAdmin, getAdminProfile } from "../../utils/roles";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
+import { useNotification } from "../../context/NotificationContext";
+import { useFeedbacks, useFeedbackMutations } from "../../hooks/data";
+import { toast } from "sonner";
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -198,17 +204,21 @@ const ReplyModal = ({ feedback, onClose, onSaved }) => {
     setSaving(true);
     setError(null);
     try {
-      const { error: dbError } = await supabase
-        .from("feedbacks")
-        .update({
-          admin_reply: reply.trim() || null,
-          replied_at: reply.trim() ? new Date().toISOString() : null,
-        })
-        .eq("id", feedback.id);
-      if (dbError) throw dbError;
-      onSaved({ ...feedback, admin_reply: reply.trim() || null });
+      if (onSaved) {
+        await onSaved(feedback.id, reply.trim());
+      } else {
+        const { error: dbError } = await supabase
+          .from("feedbacks")
+          .update({
+            admin_reply: reply.trim() || null,
+            replied_at: reply.trim() ? new Date().toISOString() : null,
+          })
+          .eq("id", feedback.id);
+        if (dbError) throw dbError;
+      }
       onClose();
     } catch (err) {
+
       if (
         err.message?.includes("admin_reply") ||
         err.message?.includes("schema cache")
@@ -318,15 +328,23 @@ const ReplyModal = ({ feedback, onClose, onSaved }) => {
 const FeedbackCard = React.memo(({
   item,
   isSuperAdmin,
+  canManageFeedbacks = false,
   onStatusChange,
   onDelete,
   onReply,
+  onRead,
 }) => {
   const typeConfig = TYPE_CONFIG[item.type] || TYPE_CONFIG.other;
   const statusConfig = STATUS_CONFIG[item.status] || STATUS_CONFIG.open;
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const reporterName =
+    item.users?.full_name ||
+    item.users?.name ||
+    getAdminProfile(item.user_id)?.full_name ||
+    "Anonymous";
 
   const handleCopyToAI = (e) => {
     e.stopPropagation();
@@ -335,7 +353,7 @@ const FeedbackCard = React.memo(({
 ### Issue Context
 - **Title**: ${item.title}
 - **Type**: ${item.type}
-- **Reporter**: ${item.users?.full_name || "Anonymous"}
+- **Reporter**: ${reporterName}
 - **URL Path**: \`${item.url_path || "N/A"}\`
 - **Device Type**: ${item.device_type}
 - **Date Reported**: ${formatDate(item.created_at)}
@@ -351,16 +369,22 @@ Please analyze this feedback and provide:
 
     navigator.clipboard.writeText(prompt).then(() => {
       setCopied(true);
+      toast.success("Feedback prompt copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
   const handleDelete = async (e) => {
     e.stopPropagation();
-    if (!window.confirm("Delete entry?")) return;
+    if (!window.confirm("Are you sure you want to permanently delete this feedback?")) {
+      return;
+    }
     setDeleting(true);
-    await onDelete(item.id);
-    setDeleting(false);
+    try {
+      await onDelete(item.id);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -369,19 +393,22 @@ Please analyze this feedback and provide:
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0 }}
-      onClick={() => setExpanded((p) => !p)}
+      onClick={() => {
+        if (!expanded && onRead) onRead(item.id);
+        setExpanded((p) => !p);
+      }}
       className="bg-white/[0.02] border border-white/[0.06] rounded-2xl relative hover:border-white/[0.12] transition-colors cursor-pointer">
       <div className="p-3.5">
         <div className="flex items-center justify-between gap-3">
           {/* Left: Type badge + Title */}
           <div className="flex flex-col items-start gap-2.5 min-w-0 flex-1">
-            <div className="flex   gap-2">
+            <div className="flex gap-2">
               <span
                 className={`mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border flex items-center gap-1 shrink-0 ${typeConfig.color} ${typeConfig.bg} ${typeConfig.border}`}>
                 {typeConfig.icon}
               </span>
               <div
-                className={`mt-0.5  scale-[0.9] origin-left px-1.5 py-0.5 rounded text-[10px] font-medium border flex items-center gap-1 shrink-0 text-white bg-white/5 opacity-30`}>
+                className={`mt-0.5 scale-[0.9] origin-left px-1.5 py-0.5 rounded text-[10px] font-medium border flex items-center gap-1 shrink-0 text-white bg-white/5 opacity-30`}>
                 <span className="flex items-center gap-1 capitalize">
                   <DeviceIcon device={item.device_type} />
                   {item.device_type}
@@ -402,8 +429,8 @@ Please analyze this feedback and provide:
               )}
               {/* Meta line */}
               <div className="flex flex-wrap flex-col items-start gap-x-2 gap-y-2 mt-1 text-[10px] text-white/35">
-                <span>{item.users?.full_name || "Anonymous"}</span>
-                {isSuperAdmin ? (
+                <span>{reporterName}</span>
+                {canManageFeedbacks ? (
                   <StatusSelector
                     current={item.status}
                     onSelect={(val) => onStatusChange(item.id, val)}
@@ -420,8 +447,8 @@ Please analyze this feedback and provide:
           </div>
 
           {/* Right: Status badge & Actions */}
-          <div className="flex  items-center gap-2 shrink-0">
-            {isSuperAdmin && (
+          <div className="flex items-center gap-2 shrink-0">
+            {canManageFeedbacks && (
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -438,20 +465,23 @@ Please analyze this feedback and provide:
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (onRead) onRead(item.id);
                     onReply(item);
                   }}
                   title="Reply"
                   className="p-1 rounded-2xl text-white/30 hover:text-[var(--accent)] hover:bg-white/5 transition-colors">
                   <MessageSquare size={12} />
                 </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  title="Delete"
-                  className="p-1 rounded-2xl text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors disabled:opacity-30">
-                  <Trash2 size={12} />
-                </button>
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    title="Delete"
+                    className="p-1 rounded-2xl text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors disabled:opacity-30">
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
             )}
 
@@ -470,7 +500,7 @@ Please analyze this feedback and provide:
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="border-t border-white/[0.06]  flex-col justify-between flex bg-white/[0.01] p-3.5 space-y-3">
+            className="border-t border-white/[0.06] flex-col justify-between flex bg-white/[0.01] p-3.5 space-y-3">
             <div>
               <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">
                 Description
@@ -509,96 +539,76 @@ Please analyze this feedback and provide:
 
 const FeedbackPanel = () => {
   const { user } = useAuth();
-  const role = user?.role?.toLowerCase();
-  const isSuperAdmin =
-    role === "super-admin" || role === "superadmin" || role === "super_admin";
+  const isSuperAdmin = checkIsSuperAdmin(user?.role);
+  const isAdm = checkIsAdmin(user?.role);
+  const canManageFeedbacks = isSuperAdmin || isAdm;
 
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { markAllFeedbacksAsRead, markAsRead } = useNotification();
+  const {
+    data: feedbacks = [],
+    isLoading: loading,
+    error: queryError,
+    refetch: fetchFeedbacks,
+  } = useFeedbacks();
+
+  const {
+    updateFeedbackStatus,
+    updateFeedbackReply,
+    deleteFeedback,
+  } = useFeedbackMutations();
+
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [replyTarget, setReplyTarget] = useState(null);
 
-  const fetchFeedbacks = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: dbError } = await supabase
-        .from("feedbacks")
-        .select("*, users(full_name, role)")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (dbError) throw dbError;
-      setFeedbacks(data || []);
-    } catch (err) {
-      setError(err.message || "Failed to load feedbacks.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Auto-mark all feedbacks as read when panel is opened / mounted
   useEffect(() => {
-    fetchFeedbacks();
+    if (markAllFeedbacksAsRead) {
+      markAllFeedbacksAsRead();
+    }
+  }, [markAllFeedbacksAsRead]);
 
-    const channel = supabase
-      .channel("feedbacks_panel_realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "feedbacks" },
-        (payload) => {
-          if (payload.eventType === "DELETE") {
-            setFeedbacks((prev) => prev.filter((f) => String(f.id) !== String(payload.old.id)));
-          } else if (payload.eventType === "UPDATE") {
-            setFeedbacks((prev) =>
-              prev.map((f) =>
-                String(f.id) === String(payload.new.id) ? { ...f, ...payload.new } : f
-              )
-            );
-          } else if (payload.eventType === "INSERT") {
-            // For insert we'd optimally fetch the user relation, but as a quick sync we can just prepend it.
-            // Note: users(name) relation won't be in the raw payload. We could fetch the single record or rely on manual refresh.
-            // For a robust sync, we can just trigger a full fetch (with limit) when an insert happens since they are rare.
-            fetchFeedbacks();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchFeedbacks]);
-
-  const handleStatusChange = useCallback(async (id, newStatus) => {
-    setFeedbacks((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, status: newStatus } : f)),
-    );
-    try {
-      await supabase
-        .from("feedbacks")
-        .update({ status: newStatus })
-        .eq("id", id);
-    } catch {
+  // Ensure fresh feedbacks list with user joins on mount
+  useEffect(() => {
+    if (fetchFeedbacks) {
       fetchFeedbacks();
     }
   }, [fetchFeedbacks]);
 
-  const handleDelete = useCallback(async (id) => {
-    try {
-      await supabase.from("feedbacks").delete().eq("id", id);
-      setFeedbacks((prev) => prev.filter((f) => f.id !== id));
-    } catch (err) {
-      alert("Delete failed: " + err.message);
-    }
-  }, []);
+  const handleStatusChange = useCallback(
+    async (id, newStatus) => {
+      try {
+        await updateFeedbackStatus(id, newStatus);
+      } catch (err) {
+        console.error("Failed to update status:", err);
+      }
+    },
+    [updateFeedbackStatus]
+  );
 
-  const handleReplySaved = useCallback((updated) => {
-    setFeedbacks((prev) =>
-      prev.map((f) => (f.id === updated.id ? updated : f)),
-    );
-  }, []);
+  const handleDelete = useCallback(
+    async (id) => {
+      try {
+        await deleteFeedback(id);
+      } catch (err) {
+        alert("Delete failed: " + err.message);
+      }
+    },
+    [deleteFeedback]
+  );
 
+  const handleReplySaved = useCallback(
+    async (feedbackId, replyText) => {
+      try {
+        await updateFeedbackReply(feedbackId, replyText);
+      } catch (err) {
+        console.error("Failed to save reply:", err);
+      }
+    },
+    [updateFeedbackReply]
+  );
+
+  const error = queryError?.message || null;
   const openCount = feedbacks.filter((f) => f.status === "open").length;
   const resolvedCount = feedbacks.filter((f) => f.status === "resolved").length;
 
@@ -607,6 +617,7 @@ const FeedbackPanel = () => {
     if (filterStatus !== "all" && f.status !== filterStatus) return false;
     return true;
   });
+
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -715,9 +726,11 @@ const FeedbackPanel = () => {
                 key={item.id}
                 item={item}
                 isSuperAdmin={isSuperAdmin}
+                canManageFeedbacks={canManageFeedbacks}
                 onStatusChange={handleStatusChange}
                 onDelete={handleDelete}
                 onReply={setReplyTarget}
+                onRead={(id) => markAsRead(`fb-${id}`)}
               />
             ))}
           </AnimatePresence>

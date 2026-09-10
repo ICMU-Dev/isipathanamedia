@@ -51,14 +51,22 @@ export default async (request) => {
 
     let title, description, image;
 
+    const isGenericText = (text) => {
+      if (!text) return true;
+      const t = text.trim();
+      return /^(facebook|log in|log into facebook|sign up|explore the things you love|see photos, profile pictures and more on facebook|connect with friends and the world around you on facebook)/i.test(t);
+    };
+
     // 1. First try Microlink API (often gets full text and bypasses basic blocks)
     try {
       const mlResponse = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(targetUrl.href)}`);
       if (mlResponse.ok) {
         const mlData = await mlResponse.json();
         if (mlData.data) {
-          title = mlData.data.title;
-          description = mlData.data.description;
+          const mlTitle = mlData.data.title;
+          const mlDesc = mlData.data.description;
+          if (!isGenericText(mlTitle)) title = mlTitle;
+          if (!isGenericText(mlDesc)) description = mlDesc;
           image = mlData.data.image?.url;
         }
       }
@@ -66,10 +74,13 @@ export default async (request) => {
       console.error("Microlink extraction failed", e);
     }
 
-    // 2. Fallback to manual scraping if Microlink failed or missed data
+    // 2. Fallback to manual scraping if any field is missing or generic
     if (!title || !description || !image) {
       const response = await fetch(targetUrl.href, {
-        headers: { 'User-Agent': 'facebookexternalhit/1.1' }
+        headers: {
+          'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+          'Accept-Language': 'en-US,en;q=0.9',
+        }
       });
       const html = await response.text();
 
@@ -105,12 +116,27 @@ export default async (request) => {
         }
       } catch (e) {}
 
-      title = title || extract(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || extract(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+      const rawTitle = extract(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                       extract(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i) ||
+                       extract(/<title[^>]*>([^<]+)<\/title>/i)?.replace(/\s*\|\s*facebook$/i, '')?.trim();
       
-      // Prefer JSON-LD description (usually full text) over OG description (usually truncated)
-      description = description || ldJsonDesc || extract(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) || extract(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i);
+      const rawDesc = ldJsonDesc ||
+                      extract(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
+                      extract(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i) ||
+                      extract(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+
+      if (!title && rawTitle && !isGenericText(rawTitle)) {
+        title = rawTitle;
+      }
+
+      if (!description && rawDesc && !isGenericText(rawDesc)) {
+        description = rawDesc;
+      }
       
-      image = image || extract(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || extract(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+      if (!image) {
+        image = extract(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                extract(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+      }
     }
 
     // Clean up title if it's just a truncated version of the description (common on Facebook)
@@ -118,11 +144,15 @@ export default async (request) => {
       const cleanTitle = title.replace(/[\n\r]+/g, ' ').trim();
       const cleanDesc = description.replace(/[\n\r]+/g, ' ').trim();
       
-      // If title is just the first part of the description, or has ellipsis
       if (cleanDesc.startsWith(cleanTitle.replace(/\.\.\.$/, '').trim()) || 
           title.includes('\n\n')) {
         title = '';
       }
+    }
+
+    // If description is empty but title has the post text (very common for FB photos/updates), use title
+    if (!description && title && !isGenericText(title)) {
+      description = title;
     }
 
     return Response.json(

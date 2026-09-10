@@ -12,6 +12,9 @@ const SmoothScroll = ({ children }) => {
   useEffect(() => {
     if (lenisRef.current) {
       lenisRef.current.resize();
+      if (!location.hash) {
+        lenisRef.current.scrollTo(0, { immediate: true });
+      }
     }
   }, [location.pathname, location.hash]);
 

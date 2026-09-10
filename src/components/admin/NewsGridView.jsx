@@ -44,6 +44,7 @@ const NewsGridView = ({
   handleEdit,
   handleReject,
   handleDelete,
+  viewsMap = {},
 }) => {
   // Group the data
   const groupedData = filteredData.reduce((acc, item) => {
@@ -294,16 +295,7 @@ const NewsGridView = ({
                           )}
                         </div>
 
-                        {/* Right: Views Counter */}
-                        <div
-                          className="flex items-center gap-1.5 text-white/50 shrink-0 bg-white/[0.04] px-2 py-1 rounded-3xl border border-white/[0.06]"
-                          title={`${item.views || 0} Views`}
-                        >
-                          <Eye size={14} className="text-white/40" />
-                          <span className="text-xs font-mono font-medium text-white/70">
-                            {item.views ?? 0}
-                          </span>
-                        </div>
+                      
                       </div>
                     </div>
                   </div>

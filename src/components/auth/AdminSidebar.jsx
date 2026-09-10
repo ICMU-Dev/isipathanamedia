@@ -44,7 +44,7 @@ const AdminSidebar = ({
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   const { news, siteConfig } = useData();
-  const { notifications } = useNotification();
+  const { notifications, unreadFeedbacksCount, unreadMessagesCount } = useNotification();
 
   const role = user?.role;
   const isSuper = isSuperAdmin(role);
@@ -63,13 +63,15 @@ const AdminSidebar = ({
   const showAttentionBadge = isAdm && pendingCount > 0;
 
   const unreadFeedbacks =
-    notifications?.filter((n) => (n.isFeedback || n.category === "feedback") && !n.read).length || 0;
+    unreadFeedbacksCount ??
+    (notifications?.filter((n) => (n.isFeedback || n.category === "feedback") && !n.read).length || 0);
   const unreadMessages =
-    notifications?.filter((n) => (n.isInbox || n.category === "inbox") && !n.read).length || 0;
-
+    unreadMessagesCount ??
+    (notifications?.filter((n) => (n.isInbox || n.category === "inbox") && !n.read).length || 0);
 
   const showSettingsBadge = isAdm && unreadFeedbacks > 0;
   const showMessagesBadge = isAdm && unreadMessages > 0;
+
 
   const isActive = (path) => location.pathname === path;
 

@@ -289,6 +289,10 @@ const ArticleViewer = () => {
   useEffect(() => {
     // Scroll instantly when ID changes, before fetch
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    if (window.lenis) {
+      window.lenis.scrollTo(0, { immediate: true });
+      window.lenis.resize();
+    }
     
     let active = true;
     
@@ -640,7 +644,13 @@ const ArticleViewer = () => {
                 </div>
               </div>
               <button
-                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                onClick={() => {
+                  if (window.lenis) {
+                    window.lenis.scrollTo(0, { duration: 1.2 });
+                  } else {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
                 className="px-6 py-3 bg-[var(--admin-card-bg)]   hover:bg-[#222] border border-white/[0.06]  rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-colors flex items-center gap-2 shadow-sm">
                 Back to Top <ArrowLeft size={12} className="rotate-90" />
               </button>

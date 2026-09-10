@@ -10,8 +10,13 @@ const NotificationRedirect = () => {
   }
 
   const searchParams = new URLSearchParams(window.location.search);
-  const to = searchParams.get("to") || "settings";
-  const hash = window.location.hash || "";
+  let to = searchParams.get("to") || "settings";
+  let hash = window.location.hash || "";
+
+  if (to === "feedbacks" || to === "feedback") {
+    to = "settings";
+    hash = "#feedbacks";
+  }
 
   if (user && user.indexNumber) {
     return <Navigate to={`/${user.indexNumber}/dashboard/${to}${hash}`} replace />;

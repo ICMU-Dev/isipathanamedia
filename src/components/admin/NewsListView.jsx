@@ -37,6 +37,7 @@ const NewsListView = ({
   handleEdit,
   handleReject,
   handleDelete,
+  viewsMap = {},
 }) => {
   // Group the data
   const groupedData = filteredData.reduce((acc, item) => {
@@ -277,11 +278,11 @@ const NewsListView = ({
                         {/* Views */}
                         <div
                           className="flex items-center gap-1 text-white/50"
-                          title={`${item.views || 0} Views`}
+                          title={`${item.views ?? viewsMap[item.id] ?? 0} Views`}
                         >
                           <Eye size={13} className="text-white/40" />
                           <span className="text-xs font-mono font-medium text-white/70">
-                            {item.views ?? 0}
+                            {item.views ?? viewsMap[item.id] ?? 0}
                           </span>
                         </div>
 

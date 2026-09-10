@@ -92,6 +92,7 @@ const HomeSection = ({ shouldAnimate }) => {
       id="home"
       ref={sectionRef}
       className="flex overflow-hidden relative flex-col justify-center items-center px-6 h-[100dvh] pt-24 pb-16 text-white bg-[#010104] font-montserrat">
+      <div id="hero" className="absolute top-0 left-0 w-px h-px pointer-events-none opacity-0" />
       <style>{`
         .line-mask {
           overflow: hidden;

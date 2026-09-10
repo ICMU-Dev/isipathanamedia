@@ -2,10 +2,13 @@ import React, { Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { DataProvider } from "./context/DataContext";
 import { AuthProvider } from "./context/AuthContext";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
 import { Toaster } from "sonner";
 
 // Shared layouts — keep eager (small, always needed)
 import MainLayout from "./components/layout/MainLayout";
+import ScrollManager from "./components/ScrollManager";
 
 // Minimal loading fallback
 const PageLoader = () => (
@@ -70,69 +73,74 @@ const FeedbackWidget = React.lazy(
 
 function App() {
   return (
-    <AuthProvider>
-      <DataProvider>
-        <Router>
-          <Suspense fallback={<PageLoader />}>
-            <FeedbackWidget />
-            <Routes>
-              {/* Direct Routes */}
-              <Route path="/auth/google/callback" element={<GoogleCallbackHandler />} />
-              <Route path="/share-target" element={<ShareTargetHandler />} />
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <DataProvider>
+          <Router>
+            <ScrollManager />
+            <Suspense fallback={<PageLoader />}>
+              <FeedbackWidget />
+              <Routes>
+                {/* Direct Routes */}
+                <Route path="/auth/google/callback" element={<GoogleCallbackHandler />} />
+                <Route path="/share-target" element={<ShareTargetHandler />} />
 
-              {/* Nethinethera Public Portal (Smooth Scrolling) */}
-              <Route element={<NethinetheraLayout />}>
-                <Route path="/nethinethera" element={<NethinetheraPage />} />
-              </Route>
-
-              {/* Public Website Routes (Shared Layout) */}
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/admin-redirect" element={<NotificationRedirect />} />
-                <Route path="/news" element={<NewsPage />} />
-                <Route path="/news/:id" element={<ArticleViewer />} />
-                <Route path="/author/:authorName" element={<AuthorPage />} />
-                <Route path="/author" element={<AuthorPage />} />
-                <Route path="/live" element={<LivePage />} />
-                                              </Route>
-
-              {/* Protected Admin Panel Routes with inline Login handling */}
-              <Route path="*" element={<NotFoundPage />} />
-              <Route path="/:adminPath" element={<ProtectedRoute />}>
-                {/* 1. Super Admin Hub (No Sidebar) */}
-                <Route element={<SuperAdminLayout />}>
-                  <Route index element={<MasterDashboard />} />
-                </Route>
-                {/* 2. Main Admin Branch (With Sidebar) */}
-                <Route path="dashboard" element={<AdminLayout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="news" element={<ManageNews />} />
-                  <Route path="news/create" element={<CreateArticle />} />
-                  <Route path="news/edit/:id" element={<CreateArticle />} />
-                  <Route path="news/update" element={<CreateUpdate />} />
-                  <Route path="news/edit-update/:id" element={<CreateUpdate />} />
-                  <Route path="team" element={<ManageTeam />} />
-                  <Route path="users" element={<Navigate to="../team" replace />} />
-                  <Route path="messages" element={<AdminMessages />} />
-                  <Route path="live" element={<LiveStreamSettings />} />
-                                                      <Route path="settings" element={<Settings />} />
-                  <Route path="profile" element={<UserProfile />} />
-                </Route>
-                {/* 3. Broadcaster Operations Branch */}
-                <Route path="broadcast" element={<BroadcasterLayout />}>
-                  <Route index element={<BroadcasterDashboard />} />
+                {/* Nethinethera Public Portal (Smooth Scrolling) */}
+                <Route element={<NethinetheraLayout />}>
+                  <Route path="/nethinethera" element={<NethinetheraPage />} />
                 </Route>
 
-              </Route>
-            </Routes>
-          </Suspense>
-        </Router>
-        <div className="fixed inset-0 z-[99999] pointer-events-none">
-          <Toaster theme="dark" position="top-center" className="pointer-events-auto" />
-        </div>
-      </DataProvider>
-    </AuthProvider>
+                {/* Public Website Routes (Shared Layout) */}
+                <Route element={<MainLayout />}>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/admin-redirect" element={<NotificationRedirect />} />
+                  <Route path="/news" element={<NewsPage />} />
+                  <Route path="/news/:id" element={<ArticleViewer />} />
+                  <Route path="/author/:authorName" element={<AuthorPage />} />
+                  <Route path="/author" element={<AuthorPage />} />
+                  <Route path="/live" element={<LivePage />} />
+                </Route>
+
+                {/* Protected Admin Panel Routes with inline Login handling */}
+                <Route path="*" element={<NotFoundPage />} />
+                <Route path="/:adminPath" element={<ProtectedRoute />}>
+                  {/* 1. Super Admin Hub (No Sidebar) */}
+                  <Route element={<SuperAdminLayout />}>
+                    <Route index element={<MasterDashboard />} />
+                  </Route>
+                  {/* 2. Main Admin Branch (With Sidebar) */}
+                  <Route path="dashboard" element={<AdminLayout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="news" element={<ManageNews />} />
+                    <Route path="news/create" element={<CreateArticle />} />
+                    <Route path="news/edit/:id" element={<CreateArticle />} />
+                    <Route path="news/update" element={<CreateUpdate />} />
+                    <Route path="news/edit-update/:id" element={<CreateUpdate />} />
+                    <Route path="team" element={<ManageTeam />} />
+                    <Route path="users" element={<Navigate to="../team" replace />} />
+                    <Route path="messages" element={<AdminMessages />} />
+                    <Route path="live" element={<LiveStreamSettings />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="feedbacks" element={<Navigate to="../settings#feedbacks" replace />} />
+                    <Route path="profile" element={<UserProfile />} />
+
+                  </Route>
+                  {/* 3. Broadcaster Operations Branch */}
+                  <Route path="broadcast" element={<BroadcasterLayout />}>
+                    <Route index element={<BroadcasterDashboard />} />
+                  </Route>
+
+                </Route>
+              </Routes>
+            </Suspense>
+          </Router>
+          <div className="fixed inset-0 z-[99999] pointer-events-none">
+            <Toaster theme="dark" position="top-center" className="pointer-events-auto" />
+          </div>
+        </DataProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

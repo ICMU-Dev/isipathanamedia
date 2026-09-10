@@ -53,3 +53,7 @@
   for = "/api/*"
   [headers.values]
     Cache-Control = "private, no-store, no-cache, must-revalidate"
+
+[[edge_functions]]
+  function = "sitemap"
+  path = "/sitemap.xml"

@@ -1,5 +1,42 @@
 [
   {
+    "id": "v2-0-1",
+    "version": "2.0.1",
+    "title": "Data Fetching Bug Fixes",
+    "subtitle": "Feature Release",
+    "badge": "FEATURE RELEASE",
+    "desc": "Fixed some minor issues with Admin + Broadcaster Role, Updates caption bugs and Data Fetching issues.",
+    "date": "Sep 11, 2026",
+    "isoDate": "2026-09-10",
+    "isMajor": false,
+    "steps": [
+      {
+        "t": "Upgraded to Tanstack v5",
+        "d": "Better invalidated Latest Data Fetching With cache handling"
+      },
+      {
+        "t": "Live Stream Issues  Fixed",
+        "d": "Issues with Role Broadcaster fixed in RLS Polices"
+      },
+      {
+        "t": "Improved Notifications & Indicators",
+        "d": "Backward Compatibility added to messages and Feedbacks notificaitons"
+      },
+      {
+        "t": "\"Updates\" related issues fixed",
+        "d": "Fixed the known issues of Captions fetching"
+      },
+      {
+        "t": "New minor improvements added",
+        "d": "Now Articles shows up to 10 in Public Page and added show more button to news section"
+      },
+      {
+        "t": "SEO Improvements",
+        "d": "Improved OG Links to show dynamic content based on articles"
+      }
+    ]
+  },
+  {
     "id": "v2-0-0",
     "version": "2.0.0",
     "title": "ICMU Web v2",

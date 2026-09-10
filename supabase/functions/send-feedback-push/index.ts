@@ -64,14 +64,19 @@ serve(async (req) => {
       return jsonResponse({ error: "Missing required fields: title, description, type" }, 400, origin);
     }
 
-    // 1. Fetch admin + super_admin user IDs
-    const { data: adminUsers, error: usersError } = await supabaseClient
+    // 1. Fetch admin + super_admin user IDs (including dual roles like admin,broadcaster)
+    const { data: allUsers, error: usersError } = await supabaseClient
       .from("users")
-      .select("id")
-      .in("role", ["admin", "super_admin", "super-admin", "superadmin"]);
+      .select("id, role");
 
     if (usersError) throw usersError;
-    if (!adminUsers?.length) return jsonResponse({ success: true, message: "No admins to notify" }, 200, origin);
+
+    const adminUsers = (allUsers || []).filter((u) => {
+      const r = (u.role || "").toLowerCase();
+      return r.includes("admin") || r.includes("super");
+    });
+
+    if (!adminUsers.length) return jsonResponse({ success: true, message: "No admins to notify" }, 200, origin);
 
     // Exclude the submitter from receiving a push notification for their own feedback
     const targetAdminIds = adminUsers

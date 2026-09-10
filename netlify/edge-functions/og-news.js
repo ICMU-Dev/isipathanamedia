@@ -1,20 +1,7 @@
-/* global Deno */
-/**
- * Netlify Edge Function — Dynamic OG Meta Tags for News Article Pages
- *
- * Social media crawlers (WhatsApp, Facebook, Twitter, iMessage, Discord, etc.)
- * don't execute JavaScript, so React Helmet meta tags are invisible to them.
- *
- * This edge function intercepts requests to /news/*,
- * detects if the request is from a bot/crawler, and if so, fetches the
- * article data from Supabase and injects proper OG meta tags into the HTML
- * before returning it. Regular users get the normal SPA experience.
- */
-
+﻿/* global Deno */
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL') || '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_PUBLISHABLE_KEY') || '';
 
-// Bot/crawler user-agent patterns
 const BOT_PATTERNS = [
   'facebookexternalhit',
   'Facebot',
@@ -42,10 +29,7 @@ function isBot(userAgent) {
 
 function stripHtml(html) {
   if (!html) return '';
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function escapeHtml(str) {
@@ -58,9 +42,6 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-/**
- * Fetch news article data from Supabase REST API.
- */
 async function fetchArticle(articleId) {
   try {
     const url = `${SUPABASE_URL}/rest/v1/news?id=eq.${articleId}&select=id,title,content,image,date,category,author,tags`;
@@ -84,15 +65,18 @@ async function fetchArticle(articleId) {
   }
 }
 
-/**
- * Build a minimal HTML page with OG meta tags for crawlers.
- */
 function buildOGPage(article, siteUrl) {
   const title = article.title || 'News Article | Isipathana College Media Unit';
   const cleanContent = stripHtml(article.content);
   const description = cleanContent.length > 160 ? cleanContent.slice(0, 160) : cleanContent || 'Read the latest news from Isipathana College Media Unit.';
+  
   const defaultImage = `${siteUrl}/og-image.png`;
-  const image = article.image || defaultImage;
+  let image = article.image || defaultImage;
+  // Fix for relative URLs
+  if (image.startsWith('/')) {
+    image = `${siteUrl}${image}`;
+  }
+
   const canonicalUrl = `${siteUrl}/news/${article.id}`;
   const author = article.author || 'Isipathana College Media Unit';
 
@@ -144,6 +128,8 @@ function buildOGPage(article, siteUrl) {
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:url" content="${escapeHtml(canonicalUrl)}">
   <meta property="og:image" content="${escapeHtml(image)}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta property="article:author" content="${escapeHtml(author)}">
 ${publishedTimeMeta ? publishedTimeMeta + '\n' : ''}${tagsHtml ? tagsHtml + '\n' : ''}
   <!-- Twitter Card -->
@@ -155,7 +141,7 @@ ${publishedTimeMeta ? publishedTimeMeta + '\n' : ''}${tagsHtml ? tagsHtml + '\n'
   <!-- Canonical -->
   <link rel="canonical" href="${escapeHtml(canonicalUrl)}">
 
-  <!-- Redirect real users to the SPA (in case a human opens the bot URL) -->
+  <!-- Redirect real users to the SPA -->
   <meta http-equiv="refresh" content="0;url=${escapeHtml(canonicalUrl)}">
 </head>
 <body>
@@ -166,31 +152,24 @@ ${publishedTimeMeta ? publishedTimeMeta + '\n' : ''}${tagsHtml ? tagsHtml + '\n'
 </html>`;
 }
 
-/**
- * Extract article ID from URL path.
- * Pattern: /news/:id
- */
 function extractArticleId(pathname) {
   const match = pathname.match(/\/news\/([^/?#]+)/);
   return match ? decodeURIComponent(match[1]) : null;
 }
+
 export default async function handler(request, context) {
   const url = new URL(request.url);
   const userAgent = request.headers.get('user-agent') || '';
 
-  // 1. Check if request comes from a social media bot/crawler
   if (!isBot(userAgent)) {
-    // 2. Normal users: pass through to SPA
     return context.next();
   }
 
-  // 3. For bots: extract article ID from URL path (/news/123 -> 123)
   const articleId = extractArticleId(url.pathname);
   if (!articleId) {
     return context.next();
   }
 
-  // Fetch article data from Supabase
   const article = await fetchArticle(articleId);
   if (!article) {
     return context.next();
@@ -210,5 +189,5 @@ export default async function handler(request, context) {
 }
 
 export const config = {
-  path: '/news/*',
+  path: '/news/*'
 };

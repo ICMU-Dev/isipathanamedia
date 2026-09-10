@@ -672,6 +672,7 @@ const NotificationDropdown = ({ isCollapsed = false, isMobile = false }) => {
                                           to={`${basePath}/dashboard/messages`}
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            markAsRead(item.id);
                                             setIsOpen(false);
                                           }}
                                           className="h-8 px-3.5 rounded-xl text-xs font-bold bg-theme-accent/15 text-theme-accent hover:bg-theme-accent/25 border border-theme-accent/30 transition-all inline-flex items-center gap-1.5 cursor-pointer">
@@ -705,6 +706,7 @@ const NotificationDropdown = ({ isCollapsed = false, isMobile = false }) => {
                                           to={`${basePath}/dashboard/settings#feedbacks`}
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            markAsRead(item.id);
                                             setIsOpen(false);
                                           }}
                                           className="h-8 px-3.5 rounded-xl text-xs font-bold bg-purple-500/15 text-purple-300 hover:bg-purple-500/25 border border-purple-500/30 transition-all inline-flex items-center gap-1.5 cursor-pointer">

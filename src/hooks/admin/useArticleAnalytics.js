@@ -45,11 +45,14 @@ export function useArticleAnalytics() {
         throw new Error(data.error);
       }
       setAnalytics(data);
+      return data;
     } catch (err) {
       console.error('Analytics fetch error:', err);
       setError(err.message || 'Analytics unavailable');
       // Return fallback data so UI still renders
-      setAnalytics({ views: 0, users: 0, avgSessionDuration: 0, deviceBreakdown: { mobile: 0, desktop: 0, tablet: 0 }, configured: false });
+      const fallback = { views: 0, users: 0, avgSessionDuration: 0, deviceBreakdown: { mobile: 0, desktop: 0, tablet: 0 }, configured: false };
+      setAnalytics(fallback);
+      return fallback;
     } finally {
       setLoading(false);
     }

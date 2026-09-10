@@ -25,7 +25,7 @@ export const ROLES = {
 export function parseRoles(roleStr) {
   if (!roleStr) return [];
   if (Array.isArray(roleStr)) {
-    return roleStr.map((r) => String(r).trim().toLowerCase()).filter(Boolean);
+    return roleStr.flatMap((r) => parseRoles(r));
   }
   if (typeof roleStr !== 'string') {
     try {
@@ -35,8 +35,13 @@ export function parseRoles(roleStr) {
     }
   }
   const cleaned = roleStr.replace(/[\[\]{}"';]/g, '');
-  return cleaned
-    .split(',')
+  // Normalize compound tokens like "admin_broadcaster" or "admin + broadcaster"
+  const normalized = cleaned
+    .replace(/admin_broadcaster/gi, 'admin,broadcaster')
+    .replace(/broadcaster_admin/gi, 'admin,broadcaster');
+
+  return normalized
+    .split(/[,+&/]+/)
     .map((r) => r.trim().toLowerCase())
     .filter(Boolean);
 }
@@ -201,6 +206,76 @@ export const AVAILABLE_ROLE_OPTIONS = [
   { value: 'super-admin', label: 'Super Admin', description: 'Full access to all terminals and user clearance matrix' },
 ];
 
+/**
+ * Known baseline admin profiles to ensure author, reporter, and team lookups
+ * always resolve gracefully even if database RLS limits user enumeration.
+ */
+export const KNOWN_ADMIN_PROFILES_LIST = [
+  {
+    id: '557bcaa8-39fd-41fc-84b2-4738127e0b00',
+    index_number: '25433',
+    role: 'admin',
+    full_name: 'Tharuka Dihen',
+    avatar_url: null,
+  },
+  {
+    id: 'aa61f4d9-8f0c-4caf-a47e-6242404e4aa4',
+    index_number: '25000',
+    role: 'admin,broadcaster',
+    full_name: 'ICMU Broadcaster',
+    avatar_url: null,
+  },
+  {
+    id: '9bd0a073-8d2f-4d61-a904-877c66963b1c',
+    index_number: '25363',
+    role: 'admin,broadcaster',
+    full_name: 'Sandupa Sansana',
+    avatar_url: null,
+  },
+  {
+    id: 'fb2a880f-7b25-4957-9c61-d3fb61b39118',
+    index_number: '24929',
+    role: 'super-admin',
+    full_name: 'Thamindu Hasarinda',
+    avatar_url: null,
+  },
+  {
+    id: '64b0e19e-5f72-4b3e-b83d-5cc70a38e317',
+    index_number: '9932',
+    role: 'admin',
+    full_name: 'ICMU Admin',
+    avatar_url: null,
+  },
+  {
+    id: '6bc30e58-7cd3-4a39-9919-b8913cebb28a',
+    index_number: '25473',
+    role: 'super-admin',
+    full_name: 'Rusath Sri Nejan',
+    avatar_url: null,
+  },
+  {
+    id: '87d02cb7-c8d8-4ac6-ada3-59a4bb235b0a',
+    index_number: '00000',
+    role: 'writer',
+    full_name: 'ICMU Writer',
+    avatar_url: null,
+  },
+];
+
+export function getAdminProfile(identifier) {
+  if (!identifier) return null;
+  const clean = String(identifier).trim().toLowerCase();
+  return (
+    KNOWN_ADMIN_PROFILES_LIST.find(
+      (u) =>
+        u.id.toLowerCase() === clean ||
+        String(u.index_number).toLowerCase() === clean ||
+        u.full_name.toLowerCase() === clean
+    ) || null
+  );
+}
+
 export { isSuperAdmin as isSuper };
 export { BROADCASTER_BASE_URL, getBroadcasterAdminUrl, getBroadcasterBaseUrl } from './broadcasterSso';
+
 

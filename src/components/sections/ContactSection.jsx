@@ -65,9 +65,12 @@ const ContactSection = () => {
     try {
       await addMessage(formState);
       setFormState({ name: "", email: "", message: "" });
+      const recaptchaEl = document.getElementById("contact-recaptcha");
+      if (recaptchaEl) recaptchaEl.checked = false;
       setStatus("success");
       setTimeout(() => setStatus(""), 3000);
     } catch (error) {
+      console.error("[ContactSection] Error transmitting message:", error);
       setStatus("error");
     }
   };

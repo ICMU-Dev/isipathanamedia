@@ -160,13 +160,14 @@ export const useUpdateForm = () => {
           const mlData = await mlRes.json();
           if (mlData.status === "success" && mlData.data) {
             const d = mlData.data;
-            // Only use Microlink data if it's not a generic login-page redirect
-            const isGeneric = d.title === "Facebook" || d.title === "Log in or sign up to view";
-            if (!isGeneric) {
-              title = d.title;
-              description = d.description;
-              imageUrl = d.image?.url || null;
-            }
+            const isGenericText = (text) =>
+              !text ||
+              /^(facebook|log in|log into facebook|sign up|explore the things you love|see photos, profile pictures and more on facebook|connect with friends and the world around you on facebook)/i.test(
+                text.trim()
+              );
+            if (!isGenericText(d.title)) title = d.title;
+            if (!isGenericText(d.description)) description = d.description;
+            imageUrl = d.image?.url || null;
           }
         } catch (e) {
           console.warn("Microlink fallback failed", e);
@@ -214,13 +215,29 @@ export const useUpdateForm = () => {
         }
       }
 
-      setFormData(prev => ({
-        ...prev,
-        title: title || prev.title,
-        content: description || prev.content,
-        image: finalImage,
-        original_link: targetUrl,
-      }));
+      setFormData(prev => {
+        const isGenericText = (text) =>
+          !text ||
+          /^(facebook|log in|log into facebook|sign up|explore the things you love|see photos, profile pictures and more on facebook|connect with friends and the world around you on facebook)/i.test(
+            text.trim()
+          );
+
+        const cleanDesc = !isGenericText(description) ? description.trim() : "";
+        const cleanTitle = !isGenericText(title) ? title.trim() : "";
+
+        // Updates primarily use 'content' for the post caption.
+        // If description is empty or generic, fall back to title.
+        const extractedContent = cleanDesc || cleanTitle || prev.content;
+        const extractedTitle = cleanTitle || (cleanDesc ? cleanDesc.substring(0, 40) : prev.title);
+
+        return {
+          ...prev,
+          title: extractedTitle,
+          content: extractedContent,
+          image: finalImage,
+          original_link: targetUrl,
+        };
+      });
       toast.success("Details extracted successfully!");
     } catch (err) {
       console.error(err);

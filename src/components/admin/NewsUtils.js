@@ -1,3 +1,5 @@
+import { getAdminProfile } from "../../utils/roles";
+
 export const getStatusColor = (status) => {
   switch (status) {
     case "published":
@@ -124,17 +126,18 @@ export const resolveAuthorInfo = (item, webUsers = []) => {
   const cleanSubmitted = (item.submitted_by || "").toString().trim().toLowerCase();
   const cleanAuthor = (item.author || "").toString().trim().toLowerCase();
 
-  const submitterUser = webUsers?.find((u) => {
-    if (!u) return false;
-    return (
-      (u.id && u.id.toString().toLowerCase() === cleanSubmitted) ||
-      (u.email && u.email.toLowerCase() === cleanSubmitted) ||
-      (u.index_number && u.index_number.toString().toLowerCase() === cleanSubmitted) ||
-      (u.indexNumber && u.indexNumber.toString().toLowerCase() === cleanSubmitted) ||
-      (u.full_name && u.full_name.toLowerCase() === cleanSubmitted) ||
-      (u.name && u.name.toLowerCase() === cleanSubmitted)
-    );
-  });
+  const submitterUser =
+    webUsers?.find((u) => {
+      if (!u) return false;
+      return (
+        (u.id && u.id.toString().toLowerCase() === cleanSubmitted) ||
+        (u.email && u.email.toLowerCase() === cleanSubmitted) ||
+        (u.index_number && u.index_number.toString().toLowerCase() === cleanSubmitted) ||
+        (u.indexNumber && u.indexNumber.toString().toLowerCase() === cleanSubmitted) ||
+        (u.full_name && u.full_name.toLowerCase() === cleanSubmitted) ||
+        (u.name && u.name.toLowerCase() === cleanSubmitted)
+      );
+    }) || getAdminProfile(cleanSubmitted);
 
   const authorUser = !isICMU
     ? webUsers?.find((u) => {
@@ -146,7 +149,7 @@ export const resolveAuthorInfo = (item, webUsers = []) => {
           (u.email && u.email.toLowerCase() === cleanAuthor) ||
           (u.index_number && u.index_number.toString().toLowerCase() === cleanAuthor)
         );
-      })
+      }) || getAdminProfile(cleanAuthor)
     : null;
 
   const authorName = isICMU

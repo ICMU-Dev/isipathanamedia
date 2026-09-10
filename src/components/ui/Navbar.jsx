@@ -21,7 +21,11 @@ const Navbar = ({ shouldAnimate }) => {
 
   const isHomePage = location.pathname === "/";
   const liveStream = siteConfig?.liveStream;
-  const isLive = liveStream?.isLive && liveStream?.videoId;
+  const platform = liveStream?.platform || "youtube";
+  const hasVideo =
+    (platform === "youtube" && Boolean(liveStream?.videoId)) ||
+    (platform === "facebook" && Boolean(liveStream?.videoUrl));
+  const isLive = Boolean(liveStream?.isLive && hasVideo);
 
   const dbSocialLinks = siteConfig?.socialLinks || {};
   const socialLinks = useMemo(
@@ -74,6 +78,14 @@ const Navbar = ({ shouldAnimate }) => {
   const scrollToTarget = useCallback((targetId) => {
     if (!targetId) return false;
     const cleanId = targetId.replace(/^#/, "");
+    if (cleanId === "hero" || cleanId === "home") {
+      if (window.lenis) {
+        window.lenis.scrollTo(0, { duration: 1.2 });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return true;
+    }
     const element = document.getElementById(cleanId);
     if (element) {
       if (window.lenis) {
@@ -196,6 +208,16 @@ const Navbar = ({ shouldAnimate }) => {
   };
 
   const handleNavClick = (item) => {
+    if (item.label === "Home" || item.link === "/" || item.link === "home" || item.link === "hero") {
+      if (isHomePage) {
+        scrollToTarget("hero");
+        window.history.replaceState(null, "", "/");
+      } else {
+        navigate("/");
+      }
+      if (isMenuOpen) toggleMenu();
+      return;
+    }
     if (item.type === "route") {
       navigate(item.link);
       if (isMenuOpen) toggleMenu();

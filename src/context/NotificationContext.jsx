@@ -20,9 +20,12 @@ import {
   Radio,
 } from "lucide-react";
 import { isAdmin as checkIsAdmin, isSuperAdmin as checkIsSuperAdmin, isWriter as checkIsWriter } from "../utils/roles";
+import { queryClient } from "../lib/queryClient";
+import { messagesKeys, feedbacksKeys, newsKeys } from "../lib/queryKeys";
 import initialChangelogs from "../data/changelogs.json";
 
 const DEV_SYSTEM_NOTIFS_KEY = "icmu_dev_system_notifications";
+
 
 const NotificationContext = createContext();
 export const useNotification = () => useContext(NotificationContext);
@@ -147,7 +150,7 @@ export const NotificationProvider = ({ children }) => {
         const [feedbacksRes, messagesRes, pendingNewsRes] = await Promise.allSettled([
           supabase
             .from("feedbacks")
-            .select("*, users(full_name, avatar_url)")
+            .select("*, users:user_id(id, full_name, role, avatar_url)")
             .order("created_at", { ascending: false })
             .limit(50),
           supabase
@@ -164,9 +167,21 @@ export const NotificationProvider = ({ children }) => {
         ]);
 
         // Process Feedbacks
+        let dbFeedbacks = [];
         if (feedbacksRes.status === "fulfilled" && !feedbacksRes.value.error) {
-          const dbFeedbacks = feedbacksRes.value.data || [];
-          for (const fb of dbFeedbacks) {
+          dbFeedbacks = feedbacksRes.value.data || [];
+        } else {
+          try {
+            const { data } = await supabase
+              .from("feedbacks")
+              .select("*")
+              .order("created_at", { ascending: false })
+              .limit(50);
+            if (data) dbFeedbacks = data;
+          } catch {}
+        }
+
+        for (const fb of dbFeedbacks) {
             const strId = `fb-${fb.id}`;
             if (dismissedIds.has(strId) || dismissedIds.has(String(fb.id))) continue;
 
@@ -189,7 +204,6 @@ export const NotificationProvider = ({ children }) => {
               isInbox: false,
             });
           }
-        }
 
         // Process Inbox Messages
         if (messagesRes.status === "fulfilled" && !messagesRes.value.error) {
@@ -377,15 +391,40 @@ export const NotificationProvider = ({ children }) => {
       const validSystemNotifs = Array.from(uniqueSystemMap.values());
 
       setNotifications((prev) => {
-        const activeDynamicSystem = prev.filter(
-          (n) => n.category === "system" && !dismissedIds.has(String(n.id))
-        );
-        const mergedSystemMap = new Map();
-        validSystemNotifs.forEach((n) => mergedSystemMap.set(String(n.id), n));
-        activeDynamicSystem.forEach((n) => mergedSystemMap.set(String(n.id), n));
+        const itemMap = new Map();
 
-        const systemNotifs = Array.from(mergedSystemMap.values());
-        const combined = [...systemNotifs, ...unifiedItems];
+        // 1. Add all freshly fetched database items (feedbacks, messages, articles)
+        unifiedItems.forEach((item) => {
+          if (!dismissedIds.has(String(item.id)) && !dismissedIds.has(String(item.rawId))) {
+            itemMap.set(String(item.id), item);
+          }
+        });
+
+        // 2. Add system notifications
+        validSystemNotifs.forEach((item) => {
+          if (!dismissedIds.has(String(item.id))) {
+            itemMap.set(String(item.id), item);
+          }
+        });
+
+        // 3. Preserve only temporary optimistic items from prev that weren't in unifiedItems yet
+        prev.forEach((item) => {
+          if (
+            (item.isInbox || item.isFeedback) &&
+            !String(item.id).startsWith("temp-") &&
+            !String(item.rawId).startsWith("temp-")
+          ) {
+            // Real DB item that no longer exists in unifiedItems (it was deleted), do NOT resurrect it!
+            return;
+          }
+          if (!dismissedIds.has(String(item.id)) && !dismissedIds.has(String(item.rawId))) {
+            if (!itemMap.has(String(item.id))) {
+              itemMap.set(String(item.id), item);
+            }
+          }
+        });
+
+        const combined = Array.from(itemMap.values());
         combined.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
@@ -403,7 +442,118 @@ export const NotificationProvider = ({ children }) => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // 3. Realtime Postgres Subscriptions for Feedbacks, Messages & News
+  // 3. Direct Synchronization with TanStack Query Cache (Single Source of Truth)
+  useEffect(() => {
+    const syncFromCache = () => {
+      const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
+      const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
+
+      const cachedMessages = queryClient.getQueryData(messagesKeys.list());
+      const cachedFeedbacks = queryClient.getQueryData(feedbacksKeys.list());
+
+      if (!Array.isArray(cachedMessages) && !Array.isArray(cachedFeedbacks)) return;
+
+      setNotifications((prev) => {
+        const itemMap = new Map();
+
+        // 1. Preserve all non-inbox and non-feedback notifications (articles, system releases)
+        prev.forEach((item) => {
+          if (
+            item.category !== "inbox" &&
+            !item.isInbox &&
+            item.category !== "feedback" &&
+            !item.isFeedback
+          ) {
+            itemMap.set(String(item.id), item);
+          }
+        });
+
+        // 2. Synchronize messages from TanStack Query cache
+        if (Array.isArray(cachedMessages)) {
+          cachedMessages.forEach((rawMsg) => {
+            const strId = `msg-${rawMsg.id}`;
+            if (dismissedIds.has(strId) || dismissedIds.has(String(rawMsg.id))) return;
+
+            itemMap.set(strId, {
+              id: strId,
+              rawId: rawMsg.id,
+              category: "inbox",
+              subType: "contact",
+              title:
+                rawMsg.subject ||
+                (rawMsg.message
+                  ? rawMsg.message.length > 50
+                    ? rawMsg.message.slice(0, 50) + "…"
+                    : rawMsg.message
+                  : `Inquiry from ${rawMsg.name || "Visitor"}`),
+              description: rawMsg.message || "",
+              senderName: rawMsg.name || "Website Visitor",
+              senderAvatar: null,
+              senderEmail: rawMsg.email || null,
+              senderPhone: rawMsg.phone || null,
+              status: rawMsg.status || "received",
+              userId: null,
+              createdAt: rawMsg.created_at || new Date().toISOString(),
+              read: readIds.has(strId) || readIds.has(String(rawMsg.id)),
+              isFeedback: false,
+              isInbox: true,
+            });
+          });
+        }
+
+        // 3. Synchronize feedbacks from TanStack Query cache
+        if (Array.isArray(cachedFeedbacks)) {
+          cachedFeedbacks.forEach((rawFb) => {
+            const strId = `fb-${rawFb.id}`;
+            if (dismissedIds.has(strId) || dismissedIds.has(String(rawFb.id))) return;
+
+            itemMap.set(strId, {
+              id: strId,
+              rawId: rawFb.id,
+              category: "feedback",
+              subType: rawFb.type || "other",
+              title: rawFb.title || "Feedback Report",
+              description: rawFb.description || "",
+              senderName: rawFb.users?.full_name || "System Admin",
+              senderAvatar: rawFb.users?.avatar_url || null,
+              senderEmail: null,
+              senderPhone: null,
+              status: rawFb.status || "open",
+              userId: rawFb.user_id || null,
+              createdAt: rawFb.created_at || new Date().toISOString(),
+              read: readIds.has(strId) || readIds.has(String(rawFb.id)),
+              isFeedback: true,
+              isInbox: false,
+            });
+          });
+        }
+
+        const combined = Array.from(itemMap.values());
+        combined.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        return combined;
+      });
+    };
+
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.type === "updated" || event?.type === "added") {
+        const queryKey = event.query.queryKey;
+        if (
+          (queryKey[0] === "messages" && queryKey[1] === "list") ||
+          (queryKey[0] === "feedbacks" && queryKey[1] === "list")
+        ) {
+          syncFromCache();
+        }
+      }
+    });
+
+    syncFromCache();
+
+    return unsubscribe;
+  }, []);
+
+  // 4. Realtime Postgres Subscriptions for Feedbacks, Messages & News
   useEffect(() => {
     const currentUserId = user?.id;
     if (!currentUserId || !canReceiveNotifications || !supabase || typeof supabase.channel !== "function") return;
@@ -419,10 +569,19 @@ export const NotificationProvider = ({ children }) => {
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            const rawId = payload.old?.id;
-            setNotifications((prev) =>
-              prev.filter((n) => n.rawId !== rawId && n.id !== `fb-${rawId}`)
-            );
+            const rawId = payload.old?.id ?? payload.new?.id;
+            if (rawId) {
+              const strRawId = String(rawId);
+              setNotifications((prev) =>
+                prev.filter(
+                  (n) =>
+                    String(n.rawId) !== strRawId &&
+                    String(n.id) !== `fb-${strRawId}` &&
+                    String(n.id) !== strRawId
+                )
+              );
+            }
+            queryClient.invalidateQueries({ queryKey: feedbacksKeys.lists() });
             return;
           }
 
@@ -435,6 +594,8 @@ export const NotificationProvider = ({ children }) => {
                   : n
               )
             );
+            queryClient.invalidateQueries({ queryKey: feedbacksKeys.lists() });
+            fetchNotifications();
             return;
           }
 
@@ -442,38 +603,42 @@ export const NotificationProvider = ({ children }) => {
             const rawFb = payload.new;
             if (!rawFb) return;
 
-            // Ignore self-submitted feedback
-            if (rawFb.user_id === currentUserId) return;
+            // Invalidate and refetch TanStack Query cache so feedback lists stay fresh
+            queryClient.invalidateQueries({ queryKey: feedbacksKeys.lists() });
+            queryClient.refetchQueries({ queryKey: feedbacksKeys.lists() });
+            fetchNotifications();
 
             const strId = `fb-${rawFb.id}`;
             const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
-            if (dismissedIds.has(strId)) return;
+            if (!dismissedIds.has(strId)) {
+              const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
+              const newItem = {
+                id: strId,
+                rawId: rawFb.id,
+                category: "feedback",
+                subType: rawFb.type || "other",
+                title: rawFb.title || "New Feedback",
+                description: rawFb.description || "",
+                senderName: "Admin User",
+                senderAvatar: null,
+                senderEmail: null,
+                senderPhone: null,
+                status: rawFb.status || "open",
+                userId: rawFb.user_id || null,
+                createdAt: rawFb.created_at || new Date().toISOString(),
+                read: readIds.has(strId),
+                isFeedback: true,
+                isInbox: false,
+              };
 
-            const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
+              setNotifications((prev) => {
+                if (prev.some((n) => n.id === strId)) return prev;
+                return [newItem, ...prev];
+              });
+            }
 
-            const newItem = {
-              id: strId,
-              rawId: rawFb.id,
-              category: "feedback",
-              subType: rawFb.type || "other",
-              title: rawFb.title || "New Feedback",
-              description: rawFb.description || "",
-              senderName: "Admin User",
-              senderAvatar: null,
-              senderEmail: null,
-              senderPhone: null,
-              status: rawFb.status || "open",
-              userId: rawFb.user_id || null,
-              createdAt: rawFb.created_at || new Date().toISOString(),
-              read: readIds.has(strId),
-              isFeedback: true,
-              isInbox: false,
-            };
-
-            setNotifications((prev) => {
-              if (prev.some((n) => n.id === strId)) return prev;
-              return [newItem, ...prev];
-            });
+            // Ignore self-submitted feedback for audio chime & toast alert
+            if (rawFb.user_id === currentUserId) return;
 
             // Audio Alert
             playNotificationSound();
@@ -557,16 +722,36 @@ export const NotificationProvider = ({ children }) => {
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            const rawId = payload.old?.id;
-            setNotifications((prev) =>
-              prev.filter((n) => n.rawId !== rawId && n.id !== `msg-${rawId}`)
-            );
+            const rawId = payload.old?.id ?? payload.new?.id;
+            if (rawId) {
+              const strRawId = String(rawId);
+              setNotifications((prev) =>
+                prev.filter(
+                  (n) =>
+                    String(n.rawId) !== strRawId &&
+                    String(n.id) !== `msg-${strRawId}` &&
+                    String(n.id) !== strRawId
+                )
+              );
+            }
+            queryClient.invalidateQueries({ queryKey: messagesKeys.lists() });
+            return;
+          }
+
+          if (payload.eventType === "UPDATE") {
+            queryClient.invalidateQueries({ queryKey: messagesKeys.lists() });
+            fetchNotifications();
             return;
           }
 
           if (payload.eventType === "INSERT") {
             const rawMsg = payload.new;
             if (!rawMsg) return;
+
+            // Invalidate and refetch TanStack Query cache so inbox updates immediately
+            queryClient.invalidateQueries({ queryKey: messagesKeys.lists() });
+            queryClient.refetchQueries({ queryKey: messagesKeys.lists() });
+            fetchNotifications();
 
             const strId = `msg-${rawMsg.id}`;
             const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
@@ -711,6 +896,7 @@ export const NotificationProvider = ({ children }) => {
               toast.info(`Article Resubmitted: "${art.title}"`);
             }
           }
+          queryClient.invalidateQueries({ queryKey: newsKeys.lists() });
           fetchNotifications();
         }
       )
@@ -724,7 +910,7 @@ export const NotificationProvider = ({ children }) => {
   // 4. Multi-Tab Synchronization via Window Storage Event
   useEffect(() => {
     const handleStorageChange = (e) => {
-      if (e.key === READ_NOTIFS_KEY || e.key === DISMISSED_NOTIFS_KEY || e.key === null) {
+      if (!e.key || e.key === READ_NOTIFS_KEY || e.key === DISMISSED_NOTIFS_KEY) {
         const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
         const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
 
@@ -743,29 +929,54 @@ export const NotificationProvider = ({ children }) => {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  // Unread Count Calculation
+  // Unread Count Calculations
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  );
+
+  const unreadFeedbacksCount = useMemo(
+    () =>
+      notifications.filter(
+        (n) => (n.isFeedback || n.category === "feedback") && !n.read
+      ).length,
+    [notifications]
+  );
+
+  const unreadMessagesCount = useMemo(
+    () =>
+      notifications.filter(
+        (n) => (n.isInbox || n.category === "inbox") && !n.read
+      ).length,
     [notifications]
   );
 
   // 5. Action Handlers
   const markAsRead = useCallback((id) => {
     const strId = String(id);
-    const cleanId = strId.replace(/^fb-/, "").replace(/^msg-/, "").replace(/^sys-/, "");
+    const cleanId = strId
+      .replace(/^fb-/, "")
+      .replace(/^msg-/, "")
+      .replace(/^sys-/, "")
+      .replace(/^art-attn-/, "")
+      .replace(/^art-review-/, "")
+      .replace(/^art-approved-/, "")
+      .replace(/^art-rejected-/, "");
+
     setNotifications((prev) =>
       prev.map((n) =>
         String(n.id) === strId ||
         String(n.rawId) === cleanId ||
         n.id === `fb-${cleanId}` ||
-        n.id === `msg-${cleanId}`
+        n.id === `msg-${cleanId}` ||
+        n.id === strId
           ? { ...n, read: true }
           : n
       )
     );
 
     const currentRead = getStoredIds(READ_NOTIFS_KEY);
-    const toAdd = [strId, cleanId, `fb-${cleanId}`];
+    const toAdd = [strId, cleanId, `fb-${cleanId}`, `msg-${cleanId}`];
     const updated = Array.from(new Set([...currentRead, ...toAdd]));
     saveStoredIds(READ_NOTIFS_KEY, updated);
     window.dispatchEvent(new Event("storage"));
@@ -773,7 +984,15 @@ export const NotificationProvider = ({ children }) => {
 
   const markAsUnread = useCallback((id) => {
     const strId = String(id);
-    const cleanId = strId.replace(/^fb-/, "").replace(/^msg-/, "").replace(/^sys-/, "");
+    const cleanId = strId
+      .replace(/^fb-/, "")
+      .replace(/^msg-/, "")
+      .replace(/^sys-/, "")
+      .replace(/^art-attn-/, "")
+      .replace(/^art-review-/, "")
+      .replace(/^art-approved-/, "")
+      .replace(/^art-rejected-/, "");
+
     setNotifications((prev) =>
       prev.map((n) =>
         String(n.id) === strId ||
@@ -786,7 +1005,7 @@ export const NotificationProvider = ({ children }) => {
     );
 
     const currentRead = getStoredIds(READ_NOTIFS_KEY);
-    const toRemove = new Set([strId, cleanId, `fb-${cleanId}`]);
+    const toRemove = new Set([strId, cleanId, `fb-${cleanId}`, `msg-${cleanId}`]);
     const updated = currentRead.filter((savedId) => !toRemove.has(savedId));
     saveStoredIds(READ_NOTIFS_KEY, updated);
     window.dispatchEvent(new Event("storage"));
@@ -798,6 +1017,8 @@ export const NotificationProvider = ({ children }) => {
       const allIds = updated.flatMap((n) => [
         String(n.id),
         String(n.rawId || ""),
+        `fb-${n.rawId}`,
+        `msg-${n.rawId}`,
       ]).filter(Boolean);
       const currentRead = getStoredIds(READ_NOTIFS_KEY);
       const merged = Array.from(new Set([...currentRead, ...allIds]));
@@ -809,12 +1030,18 @@ export const NotificationProvider = ({ children }) => {
 
   const markAllFeedbacksAsRead = useCallback(() => {
     setNotifications((prev) => {
-      const updated = prev.map((n) => (n.isFeedback ? { ...n, read: true } : n));
-      const fbIds = updated.filter((n) => n.isFeedback).flatMap((n) => [
-        String(n.id),
-        String(n.rawId || ""),
-        `fb-${n.rawId}`,
-      ]).filter(Boolean);
+      const updated = prev.map((n) =>
+        n.isFeedback || n.category === "feedback" ? { ...n, read: true } : n
+      );
+      const fbIds = updated
+        .filter((n) => n.isFeedback || n.category === "feedback")
+        .flatMap((n) => [
+          String(n.id),
+          String(n.rawId || ""),
+          `fb-${n.rawId}`,
+          `fb-${n.id}`,
+        ])
+        .filter(Boolean);
       const currentRead = getStoredIds(READ_NOTIFS_KEY);
       saveStoredIds(READ_NOTIFS_KEY, Array.from(new Set([...currentRead, ...fbIds])));
       window.dispatchEvent(new Event("storage"));
@@ -824,14 +1051,25 @@ export const NotificationProvider = ({ children }) => {
 
   const markAllMessagesAsRead = useCallback(() => {
     setNotifications((prev) => {
-      const updated = prev.map((n) => (n.isInbox ? { ...n, read: true } : n));
-      const msgIds = updated.filter((n) => n.isInbox).map((n) => String(n.id));
+      const updated = prev.map((n) =>
+        n.isInbox || n.category === "inbox" ? { ...n, read: true } : n
+      );
+      const msgIds = updated
+        .filter((n) => n.isInbox || n.category === "inbox")
+        .flatMap((n) => [
+          String(n.id),
+          String(n.rawId || ""),
+          `msg-${n.rawId}`,
+          `msg-${n.id}`,
+        ])
+        .filter(Boolean);
       const currentRead = getStoredIds(READ_NOTIFS_KEY);
       saveStoredIds(READ_NOTIFS_KEY, Array.from(new Set([...currentRead, ...msgIds])));
       window.dispatchEvent(new Event("storage"));
       return updated;
     });
   }, []);
+
 
 
   const dismissNotification = useCallback((id) => {
@@ -998,6 +1236,8 @@ export const NotificationProvider = ({ children }) => {
     () => ({
       notifications,
       unreadCount,
+      unreadFeedbacksCount,
+      unreadMessagesCount,
       permissionGranted,
       isLoadingFeedbacks: isLoadingNotifications,
       isLoadingNotifications,
@@ -1023,6 +1263,8 @@ export const NotificationProvider = ({ children }) => {
     [
       notifications,
       unreadCount,
+      unreadFeedbacksCount,
+      unreadMessagesCount,
       permissionGranted,
       isLoadingNotifications,
       notificationError,

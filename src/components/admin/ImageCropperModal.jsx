@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import ReactCrop, { centerCrop, makeAspectCrop, convertToPixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { X, Crop, Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const ASPECT_RATIO = 16 / 9;
 
@@ -34,11 +35,96 @@ const ImageCropperModal = ({
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [safeImageSrc, setSafeImageSrc] = useState(null);
+  const [isLoadingSrc, setIsLoadingSrc] = useState(false);
   const imgRef = useRef(null);
+  const objectUrlRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Ensure remote images are converted to local blob URLs to prevent tainted canvas SecurityError
+  useEffect(() => {
+    if (!isOpen || !imageSrc) {
+      setSafeImageSrc(null);
+      return;
+    }
+
+    if (imageSrc.startsWith("blob:") || imageSrc.startsWith("data:")) {
+      setSafeImageSrc(imageSrc);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoadingSrc(true);
+
+    const loadAsBlob = async () => {
+      try {
+        let blob = null;
+
+        // Attempt 1: Direct CORS fetch
+        try {
+          const res = await fetch(imageSrc, { mode: "cors" });
+          if (res.ok) {
+            blob = await res.blob();
+          }
+        } catch (_) {}
+
+        // Attempt 2: Netlify proxy-image endpoint
+        if (!blob) {
+          try {
+            const proxyRes = await fetch(`/api/proxy-image?url=${encodeURIComponent(imageSrc)}`);
+            if (proxyRes.ok) {
+              blob = await proxyRes.blob();
+            }
+          } catch (_) {}
+        }
+
+        // Attempt 3: AllOrigins proxy fallback
+        if (!blob) {
+          try {
+            const allOriginsRes = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(imageSrc)}`);
+            if (allOriginsRes.ok) {
+              blob = await allOriginsRes.blob();
+            }
+          } catch (_) {}
+        }
+
+        if (isCancelled) return;
+
+        if (blob && blob.type && blob.type.startsWith("image")) {
+          const localUrl = URL.createObjectURL(blob);
+          if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+          }
+          objectUrlRef.current = localUrl;
+          setSafeImageSrc(localUrl);
+        } else {
+          setSafeImageSrc(imageSrc);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.warn("Could not load image as blob, using original src:", err);
+          setSafeImageSrc(imageSrc);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingSrc(false);
+        }
+      }
+    };
+
+    loadAsBlob();
+
+    return () => {
+      isCancelled = true;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [isOpen, imageSrc]);
 
   if (!isOpen || !imageSrc || !mounted) return null;
 
@@ -123,7 +209,12 @@ const ImageCropperModal = ({
       const croppedFile = await generateCroppedImage();
       if (croppedFile) {
         onCropComplete(croppedFile);
+      } else {
+        toast.error("Failed to crop image. The image could not be processed.");
       }
+    } catch (err) {
+      console.error("Failed to crop image:", err);
+      toast.error("Cropping failed: " + (err?.message || "Unknown error"));
     } finally {
       setIsProcessing(false);
     }
@@ -173,21 +264,27 @@ const ImageCropperModal = ({
         </div>
 
         <div className="p-6 flex-1 overflow-auto bg-black flex items-center justify-center min-h-[300px]">
-          <ReactCrop
-            crop={crop}
-            onChange={(_, percentCrop) => setCrop(percentCrop)}
-            onComplete={(c) => setCompletedCrop(c)}
-            aspect={currentRatio}
-            className="max-h-[60vh]">
-            <img
-              ref={imgRef}
-              src={imageSrc}
-              alt="Crop preview"
-              onLoad={onImageLoad}
-              className="max-h-[60vh] object-contain"
-              crossOrigin="anonymous"
-            />
-          </ReactCrop>
+          {isLoadingSrc ? (
+            <div className="flex flex-col items-center justify-center gap-3 p-8 text-white/60">
+              <Loader2 size={32} className="animate-spin text-theme-accent" />
+              <p className="text-xs font-medium tracking-wide">Preparing image for editing...</p>
+            </div>
+          ) : (
+            <ReactCrop
+              crop={crop}
+              onChange={(_, percentCrop) => setCrop(percentCrop)}
+              onComplete={(c) => setCompletedCrop(c)}
+              aspect={currentRatio}
+              className="max-h-[60vh]">
+              <img
+                ref={imgRef}
+                src={safeImageSrc || imageSrc}
+                alt="Crop preview"
+                onLoad={onImageLoad}
+                className="max-h-[60vh] object-contain"
+              />
+            </ReactCrop>
+          )}
         </div>
 
         <div className="p-4 md:p-6 border-t border-white/[0.06] flex items-center justify-end gap-3 bg-[var(--admin-input-bg)]">

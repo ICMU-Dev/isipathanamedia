@@ -20,6 +20,7 @@ import ImageWithLoader from "../../components/ui/ImageWithLoader";
 import iconLogo from "../../assets/image.png";
 import loadingLogo from "../../assets/main-logos.png";
 import { getPublicAuthorName, isInstitutionAuthor } from "../../utils/authorUtils";
+import { isAdmin as checkIsAdmin } from "../../utils/roles";
 
 const AuthorPage = () => {
   const { authorName: urlAuthorName } = useParams();
@@ -27,14 +28,17 @@ const AuthorPage = () => {
   const { news, fetchNews, isFetching, loading } = useData();
   const { user } = useAuth();
   
-  const userRole = user?.role?.toLowerCase();
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'super-admin' || userRole === 'superadmin';
+  const isAdmin = checkIsAdmin(user?.role);
 
   const isLoadingNews = (isFetching || loading) && (!news || news.length === 0);
   const navigate = useNavigate();
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    if (window.lenis) {
+      window.lenis.scrollTo(0, { immediate: true });
+      window.lenis.resize();
+    }
     fetchNews(false, 0, 30);
   }, [fetchNews]);
 

@@ -102,9 +102,10 @@ const Settings = () => {
   const { siteConfig, updateSiteConfig, fetchData } = useData();
   const { themeId, setTheme, themes } = useTheme();
   const { user } = useAuth();
-  const { markAllFeedbacksAsRead, notifications } = useNotification();
+  const { markAllFeedbacksAsRead, notifications, unreadFeedbacksCount } = useNotification();
   const unreadFeedbacks =
-    notifications?.filter((n) => n.isFeedback && !n.read).length || 0;
+    unreadFeedbacksCount ??
+    (notifications?.filter((n) => (n.isFeedback || n.category === "feedback") && !n.read).length || 0);
 
   const role = user?.role;
   const isSuper = isSuperAdmin(role);
@@ -146,6 +147,16 @@ const Settings = () => {
     ? rawHash
     : "appearance";
   const setActiveTab = (tab) => navigate({ hash: tab }, { replace: true });
+
+  // Auto-mark feedbacks as read when navigating directly to feedbacks tab
+  useEffect(() => {
+    if (activeTab === "feedbacks") {
+      if (unreadFeedbacks > 0 && markAllFeedbacksAsRead) {
+        markAllFeedbacksAsRead();
+      }
+    }
+  }, [activeTab, unreadFeedbacks, markAllFeedbacksAsRead]);
+
   const [configState, setConfigState] = useState(siteConfig || {});
   const [rawJsonText, setRawJsonText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");

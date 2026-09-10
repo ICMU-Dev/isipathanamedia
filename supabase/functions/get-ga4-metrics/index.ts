@@ -134,7 +134,16 @@ serve(async (req) => {
 
     // ── Multi-Method Authorization Check ──
     let isAuthorized = false;
-    const allowedRoles = ["admin", "super_admin", "super-admin", "superadmin", "writer"];
+    const isRoleAuthorized = (r?: string | null) => {
+      if (!r) return false;
+      const lower = r.toLowerCase();
+      return (
+        lower.includes("admin") ||
+        lower.includes("super") ||
+        lower.includes("writer") ||
+        lower.includes("broadcaster")
+      );
+    };
 
     // 1. Supabase Auth JWT (if present and not just anon key)
     const authHeader = req.headers.get("Authorization");
@@ -150,7 +159,7 @@ serve(async (req) => {
               .select("role, is_active")
               .eq("id", user.id)
               .maybeSingle();
-            if (userData && userData.is_active !== false && allowedRoles.includes(userData.role)) {
+            if (userData && userData.is_active !== false && isRoleAuthorized(userData.role)) {
               isAuthorized = true;
             }
           }
@@ -166,7 +175,7 @@ serve(async (req) => {
         .select("id, role, is_active")
         .eq("index_number", indexNumber.toString())
         .maybeSingle();
-      if (userData && userData.is_active !== false && allowedRoles.includes(userData.role)) {
+      if (userData && userData.is_active !== false && isRoleAuthorized(userData.role)) {
         isAuthorized = true;
       }
     }
@@ -178,7 +187,7 @@ serve(async (req) => {
         .select("id, role, is_active")
         .eq("id", userId)
         .maybeSingle();
-      if (userData && userData.is_active !== false && allowedRoles.includes(userData.role)) {
+      if (userData && userData.is_active !== false && isRoleAuthorized(userData.role)) {
         isAuthorized = true;
       }
     }

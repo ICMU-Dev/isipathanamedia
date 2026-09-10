@@ -21,6 +21,8 @@ import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import { isAdmin, isWriter, isBroadcaster } from "../../utils/roles";
 import { UserAvatar } from "../ui/avatar";
+import { queryClient } from "../../lib/queryClient";
+import { feedbacksKeys } from "../../lib/queryKeys";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -290,6 +292,10 @@ const FeedbackWidget = () => {
       });
 
       if (dbError) throw dbError;
+
+      // Invalidate and refetch feedbacks cache immediately
+      queryClient.invalidateQueries({ queryKey: feedbacksKeys.lists() });
+      queryClient.refetchQueries({ queryKey: feedbacksKeys.lists() });
 
       // Use a generic settings path — the recipient admin's own session/routing will
       // resolve to the correct dynamic index path when they click the notification.

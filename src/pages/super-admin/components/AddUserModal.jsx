@@ -1,9 +1,24 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, UserPlus } from "lucide-react";
 import RolePicker from "./RolePicker";
 
 const AddUserModal = ({ isOpen, onClose, newUser, setNewUser, onSubmit }) => {
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || typeof document === "undefined") return null;
 
   const isFormValid = Boolean(
     newUser.full_name?.trim() &&
@@ -11,10 +26,16 @@ const AddUserModal = ({ isOpen, onClose, newUser, setNewUser, onSubmit }) => {
     newUser.role?.trim()
   );
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md sm:p-4 animate-in fade-in duration-300">
-      <div className="bg-[#0c0c0f] border border-white/[0.1] rounded-t-[2rem] sm:rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
-        <div className="p-6 sm:p-8">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[240] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md sm:p-4 animate-in fade-in duration-300 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}>
+      <div
+        className="bg-[#0c0c0f] border border-white/[0.1] rounded-t-[2rem] sm:rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-4 sm:zoom-in-95 duration-300 max-h-[min(90vh,calc(100dvh-40px))] flex flex-col my-auto"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar">
           <div className="flex justify-between items-start mb-6">
             <div>
               <h3 className="text-xl font-bold text-white mb-1 tracking-tight">
@@ -86,7 +107,8 @@ const AddUserModal = ({ isOpen, onClose, newUser, setNewUser, onSubmit }) => {
           </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

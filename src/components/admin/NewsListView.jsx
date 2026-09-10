@@ -23,6 +23,7 @@ import {
 } from "./NewsUtils";
 import ImageWithLoader from "../ui/ImageWithLoader";
 import iconLogo from "../../assets/image.png";
+import { UserAvatar } from "../ui/avatar";
 
 const NewsListView = ({
   filteredData,
@@ -242,19 +243,13 @@ const NewsListView = ({
                             </div>
                           ) : (
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-5 h-5 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                                {avatarUrl ? (
-                                  <img
-                                    src={avatarUrl}
-                                    alt={authorName}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-[7.5px] font-bold text-white/80">
-                                    {initials}
-                                  </span>
-                                )}
-                              </div>
+                              <UserAvatar
+                                src={avatarUrl}
+                                name={authorName}
+                                size="xs"
+                                className="w-5 h-5 bg-white/[0.04] border border-white/[0.08] shadow-sm shrink-0"
+                                fallbackClassName="text-[7.5px] font-bold text-white/80"
+                              />
                               <span className="text-xs font-semibold text-white/90 truncate">
                                 {authorName}
                               </span>
@@ -263,19 +258,13 @@ const NewsListView = ({
                         ) : (
                           /* For Updates: Hide ICMU, show submitter directly */
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-5 h-5 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                              {avatarUrl ? (
-                                <img
-                                  src={avatarUrl}
-                                  alt={submitterName || authorName}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-[7.5px] font-bold text-white/80">
-                                  {submitterInitials || initials}
-                                </span>
-                              )}
-                            </div>
+                            <UserAvatar
+                              src={avatarUrl}
+                              name={submitterName || authorName}
+                              size="xs"
+                              className="w-5 h-5 bg-white/[0.04] border border-white/[0.08] shadow-sm shrink-0"
+                              fallbackClassName="text-[7.5px] font-bold text-white/80"
+                            />
                             <span className="text-xs font-semibold text-white/90 truncate">
                               {submitterName || authorName || "ICMU Member"}
                             </span>
@@ -298,8 +287,12 @@ const NewsListView = ({
 
                         <button
                           type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingArticle(item);
+                          }}
                           aria-label="More options"
-                          className="text-white/35 hover:text-white transition-colors p-1 rounded-3xl  hover:bg-white/[0.06]"
+                          className="text-white/35 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/[0.08]"
                         >
                           <MoreHorizontal size={15} />
                         </button>

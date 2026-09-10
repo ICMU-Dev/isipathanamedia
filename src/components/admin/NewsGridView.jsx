@@ -30,6 +30,7 @@ import {
 } from "./NewsUtils";
 import ImageWithLoader from "../ui/ImageWithLoader";
 import iconLogo from "../../assets/image.png";
+import { UserAvatar } from "../ui/avatar";
 
 const NewsGridView = ({
   filteredData,
@@ -44,22 +45,6 @@ const NewsGridView = ({
   handleReject,
   handleDelete,
 }) => {
-  const [openDropdownId, setOpenDropdownId] = useState(null);
-
-  useEffect(() => {
-    const handleClickOutside = () => setOpenDropdownId(null);
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  const handleCopyLink = (e, item) => {
-    e.stopPropagation();
-    const url = `${window.location.origin}/news/${item.id}`;
-    navigator.clipboard.writeText(url);
-    toast.success("Link copied!");
-    setOpenDropdownId(null);
-  };
-
   // Group the data
   const groupedData = filteredData.reduce((acc, item) => {
     const label = getRelativeDateLabel(item.date);
@@ -163,38 +148,17 @@ const NewsGridView = ({
                             ? item.title || "Untitled Article" 
                             : (item.content ? item.content.replace(/<[^>]*>?/gm, '') : "Quick Update")}
                         </h3>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTimeout(() => {
-                                setOpenDropdownId(openDropdownId === item.id ? null : item.id);
-                              }, 0);
-                            }}
-                            aria-label="More options"
-                            className={`transition-colors shrink-0 p-1 rounded-3xl  hover:bg-white/[0.08] ${openDropdownId === item.id ? 'text-white bg-white/10' : 'text-white/35 hover:text-white'}`}
-                          >
-                            <MoreHorizontal size={16} />
-                          </button>
-
-                          {/* Dropdown Menu */}
-                          {openDropdownId === item.id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl py-1 z-[100]" onClick={e => e.stopPropagation()}>
-                    
-                              
-                              <button onClick={(e) => handleCopyLink(e, item)} className="w-full text-left px-3 py-2 text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
-                                <Copy size={14} className="opacity-70" /> Copy Public Link
-                              </button>
-                              <button onClick={() => { setOpenDropdownId(null); handleEdit(item.id); }} className="w-full text-left px-3 py-2 text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
-                                <Edit2 size={14} className="opacity-70" /> Edit {isArticle ? 'Article' : 'Update'}
-                              </button>
-                              <button onClick={() => { setOpenDropdownId(null); handleDelete(item.id); }} className="w-full text-left px-3 py-2 text-[13px] font-medium text-red-400/80 hover:text-red-400 hover:bg-red-400/10 flex items-center gap-2 transition-colors">
-                                <Trash2 size={14} className="opacity-70" /> Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingArticle(item);
+                          }}
+                          aria-label="More options"
+                          className="transition-colors shrink-0 p-1.5 rounded-full hover:bg-white/[0.1] text-white/40 hover:text-white"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
                       </div>
 
                       {/* Line 2: Visibility | Date | Source */}
@@ -301,19 +265,13 @@ const NewsGridView = ({
                               </div>
                             ) : (
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-5 h-5 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                                  {avatarUrl ? (
-                                    <img
-                                      src={avatarUrl}
-                                      alt={authorName}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className="text-[7.5px] font-bold text-white/80">
-                                      {initials}
-                                    </span>
-                                  )}
-                                </div>
+                                <UserAvatar
+                                  src={avatarUrl}
+                                  name={authorName}
+                                  size="xs"
+                                  className="w-5 h-5 bg-white/[0.04] border border-white/[0.08] shadow-sm shrink-0"
+                                  fallbackClassName="text-[7.5px] font-bold text-white/80"
+                                />
                                 <span className="text-xs font-semibold text-white/90 truncate">
                                   {authorName}
                                 </span>
@@ -322,19 +280,13 @@ const NewsGridView = ({
                           ) : (
                             /* For Updates: Hide ICMU, show submitter directly */
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-5 h-5 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-                                {avatarUrl ? (
-                                  <img
-                                    src={avatarUrl}
-                                    alt={submitterName || authorName}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-[7.5px] font-bold text-white/80">
-                                    {submitterInitials || initials}
-                                  </span>
-                                )}
-                              </div>
+                              <UserAvatar
+                                src={avatarUrl}
+                                name={submitterName || authorName}
+                                size="xs"
+                                className="w-5 h-5 bg-white/[0.04] border border-white/[0.08] shadow-sm shrink-0"
+                                fallbackClassName="text-[7.5px] font-bold text-white/80"
+                              />
                               <span className="text-xs font-semibold text-white/90 truncate">
                                 {submitterName || authorName || "ICMU Member"}
                               </span>

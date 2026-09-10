@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { DataProvider } from "./context/DataContext";
 import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "sonner";
@@ -113,6 +113,7 @@ function App() {
                   <Route path="news/update" element={<CreateUpdate />} />
                   <Route path="news/edit-update/:id" element={<CreateUpdate />} />
                   <Route path="team" element={<ManageTeam />} />
+                  <Route path="users" element={<Navigate to="../team" replace />} />
                   <Route path="messages" element={<AdminMessages />} />
                   <Route path="live" element={<LiveStreamSettings />} />
                                                       <Route path="settings" element={<Settings />} />

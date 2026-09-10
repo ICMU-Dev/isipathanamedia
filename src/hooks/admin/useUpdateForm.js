@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
+import { isAdmin as checkIsAdmin, isSuperAdmin as checkIsSuperAdmin } from "../../utils/roles";
 import { toast } from "sonner";
 
 export const useUpdateForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { news, addNews, updateNews, uploadImage, compressImage, fetchNews } = useData();
+  const { news, addNews, updateNews, uploadImage, compressImage, fetchNews, fetchAdminData } = useData();
   const { user } = useAuth();
 
   const [link, setLink] = useState("");
@@ -18,6 +19,27 @@ export const useUpdateForm = () => {
   // Cropper state
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
+  const imageToCropRef = useRef(null);
+
+  useEffect(() => {
+    imageToCropRef.current = imageToCrop;
+  }, [imageToCrop]);
+
+  useEffect(() => {
+    return () => {
+      if (imageToCropRef.current) {
+        URL.revokeObjectURL(imageToCropRef.current);
+      }
+    };
+  }, []);
+
+  const closeCropModal = () => {
+    setCropModalOpen(false);
+    if (imageToCrop) {
+      URL.revokeObjectURL(imageToCrop);
+    }
+    setImageToCrop(null);
+  };
 
   const [formData, setFormData] = useState({
     title: "",
@@ -40,16 +62,20 @@ export const useUpdateForm = () => {
 
   const isEditing = Boolean(id);
   
-  const role = user?.role?.toLowerCase();
-  const isSuperAdmin = role === 'super-admin' || role === 'superadmin' || role === 'super_admin';
-  const isAdmin = role === 'admin' || isSuperAdmin;
+  const role = user?.role;
+  const isSuperAdmin = checkIsSuperAdmin(role);
+  const isAdmin = checkIsAdmin(role);
   
   const canEditMetadata = !isEditing || (formData.submitted_by === user?.id) || isAdmin;
 
   // Load existing data if editing
   useEffect(() => {
-    fetchNews();
-  }, [fetchNews]);
+    if (fetchAdminData) {
+      fetchAdminData();
+    } else {
+      fetchNews(false, 0, 1000, true);
+    }
+  }, [fetchAdminData, fetchNews]);
 
   useEffect(() => {
     if (isEditing && news.length > 0) {
@@ -213,6 +239,9 @@ export const useUpdateForm = () => {
         return;
     }
     
+    if (imageToCrop) {
+      URL.revokeObjectURL(imageToCrop);
+    }
     const localUrl = URL.createObjectURL(file);
     setImageToCrop(localUrl);
     setCropModalOpen(true);
@@ -221,6 +250,9 @@ export const useUpdateForm = () => {
 
   const handleCropComplete = async (croppedFile) => {
     setCropModalOpen(false);
+    if (imageToCrop) {
+      URL.revokeObjectURL(imageToCrop);
+    }
     setImageToCrop(null);
     setUploading(true);
     
@@ -306,6 +338,7 @@ export const useUpdateForm = () => {
     setCropModalOpen,
     imageToCrop,
     setImageToCrop,
+    closeCropModal,
     extractData,
     handleFileUpload,
     handleCropComplete,

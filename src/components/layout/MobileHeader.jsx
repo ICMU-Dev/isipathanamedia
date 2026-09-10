@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link, useParams, useLocation } from "react-router-dom";
 import MainLogos from "../../assets/main-logos.png";
 import ActiveAdmins from "./ActiveAdmins";
+import NotificationDropdown from "./NotificationDropdown";
 import { useAuth } from "../../context/AuthContext";
 
 const MobileHeader = () => {
@@ -59,7 +60,8 @@ const MobileHeader = () => {
                     </span>
                   </div>
                 </Link>
-                <div className="flex items-center justify-end">
+                <div className="flex items-center gap-2 justify-end">
+                  <NotificationDropdown isMobile={true} />
                   <ActiveAdmins isCollapsed={true} isMobile={true} />
                 </div>
               </div>
@@ -120,10 +122,11 @@ const MobileHeader = () => {
                 </div>
               </Link>
 
-              {/* Right Pill (Active Admins) */}
+              {/* Right Pill (Notifications + Active Admins) */}
               <div 
-                className="relative rounded-full shadow-[0_8px_32px_0_rgba(0,0,0,0.95)] overflow-visible border border-[var(--admin-border)] px-2 h-[48px] flex items-center justify-center min-w-[48px] backdrop-blur-sm"
+                className="relative rounded-full shadow-[0_8px_32px_0_rgba(0,0,0,0.95)] overflow-visible border border-[var(--admin-border)] px-2.5 h-[48px] flex items-center justify-center gap-2 backdrop-blur-sm"
                 style={{ backgroundColor: "color-mix(in srgb, var(--admin-bg) 40%, transparent)" }}>
+                <NotificationDropdown isMobile={true} />
                 <div className="relative z-10 flex items-center justify-center h-full">
                   <ActiveAdmins isCollapsed={true} isMobile={true} />
                 </div>

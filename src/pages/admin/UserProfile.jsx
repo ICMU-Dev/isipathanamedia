@@ -27,6 +27,7 @@ import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import TabHeader from "../../components/admin/TabHeader";
 import ProfileSkeleton from "../../components/admin/ProfileSkeleton";
+import { UserAvatar } from "../../components/ui/avatar";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const SECONDS_PER_MINUTE = 60;
@@ -128,8 +129,8 @@ const UserProfile = () => {
 
   // ─── Data Fetching ───
   useEffect(() => {
-    if (user) fetchUserData();
-  }, [user]);
+    if (user?.id || user?.indexNumber || user?.email) fetchUserData();
+  }, [user?.id, user?.indexNumber, user?.email]);
 
   const fetchUserData = async () => {
     try {
@@ -289,6 +290,7 @@ const UserProfile = () => {
       if (!res.success) throw new Error(res.message);
 
       setUserData((prev) => ({ ...prev, email: null })); // Optionally clear email or keep it if they have a password
+      setGoogleAvatarUrl(null);
       setMsg({
         type: "success",
         text: "Google account unlinked successfully.",
@@ -331,6 +333,7 @@ const UserProfile = () => {
       setMsg({ type: "error", text: "An error occurred." });
     } finally {
       setIsUploadingAvatar(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -352,15 +355,30 @@ const UserProfile = () => {
   };
 
   useEffect(() => {
+    let isMounted = true;
     const fetchGoogleAvatar = async () => {
-      const googlePic =
-        data?.user?.user_metadata?.avatar_url ||
-        data?.user?.user_metadata?.picture;
-      if (googlePic) {
-        setGoogleAvatarUrl(googlePic);
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error || !data?.user) return;
+        const googleIdentity = data.user.identities?.find(
+          (id) => id.provider === "google"
+        );
+        const googlePic =
+          data.user.user_metadata?.avatar_url ||
+          data.user.user_metadata?.picture ||
+          googleIdentity?.identity_data?.avatar_url ||
+          googleIdentity?.identity_data?.picture;
+        if (googlePic && isMounted) {
+          setGoogleAvatarUrl(googlePic);
+        }
+      } catch (err) {
+        console.error("Error fetching Google avatar:", err);
       }
     };
     fetchGoogleAvatar();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleUseGoogleAvatar = async () => {
@@ -444,7 +462,13 @@ const UserProfile = () => {
     });
   }, [userData?.active_sessions, currentDeviceId]);
 
-  const currentAvatar = userData?.avatar_url || user?.avatarUrl;
+  const currentAvatar =
+    userData?.avatar_url ||
+    userData?.avatarUrl ||
+    userData?.profile ||
+    userData?.profile_picture ||
+    user?.avatarUrl ||
+    user?.avatar_url;
 
   const renderModalContent = () => {
     if (activeModal === "edit_name") {
@@ -816,29 +840,21 @@ const UserProfile = () => {
       {/* Profile Header (Centered) */}
       <div className="flex flex-col items-center mb-10 relative">
         <div className="relative mb-5">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden ring-[3px] ring-white/5 shadow-2xl bg-[var(--admin-input-bg)] border border-[var(--admin-border)] flex items-center justify-center relative">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleAvatarUpload}
-              accept="image/*"
-              className="hidden"
-            />
-
-            <span className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-[var(--admin-text-primary)] z-0">
-              {getInitials(userData?.full_name || user?.name)}
-            </span>
-            {currentAvatar && (
-              <img
-                src={currentAvatar}
-                alt="Profile"
-                className="w-full h-full object-cover relative z-10"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            )}
-          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleAvatarUpload}
+            accept="image/*"
+            className="hidden"
+          />
+          <UserAvatar
+            src={currentAvatar}
+            user={userData || user}
+            name={userData?.full_name || user?.name}
+            size="2xl"
+            className="ring-[3px] ring-white/5 shadow-2xl bg-[var(--admin-input-bg)] border border-[var(--admin-border)]"
+            fallbackClassName="text-3xl font-bold text-[var(--admin-text-primary)]"
+          />
           {/* Persistent Camera Badge like the inspiration */}
           <div
             onClick={() => fileInputRef.current?.click()}

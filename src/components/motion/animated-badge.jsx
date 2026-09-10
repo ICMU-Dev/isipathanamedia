@@ -19,6 +19,7 @@ const STATUS_CLASS = {
   success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
   warning: "border-amber-500/30 bg-amber-500/10 text-amber-400",
   danger: "border-red-600/30 bg-red-600/10 text-red-400",
+  error: "border-red-600/30 bg-red-600/10 text-red-400",
   loading: "border-cyan-500/30 bg-cyan-500/10 text-cyan-400",
 };
 
@@ -38,6 +39,7 @@ const ICONS = {
   success: Check,
   warning: AlertTriangle,
   danger: X,
+  error: X,
   loading: LoaderCircle,
 };
 
@@ -105,7 +107,7 @@ export function AnimatedBadge({
   ...rest
 }) {
   const reduce = useReducedMotion();
-  const Icon = ICONS[status];
+  const Icon = ICONS[status] || ICONS.neutral;
   const resolvedContentKey =
     contentKey ??
     (typeof children === "string" || typeof children === "number"
@@ -119,8 +121,8 @@ export function AnimatedBadge({
       className={cn(
         "relative inline-flex shrink-0 items-center overflow-hidden whitespace-nowrap rounded-full border font-medium tabular-nums",
         "transition-colors duration-300",
-        STATUS_CLASS[status],
-        SIZE_CLASS[size],
+        STATUS_CLASS[status] || STATUS_CLASS.neutral,
+        SIZE_CLASS[size] || SIZE_CLASS.md,
         className,
       )}
       {...rest}>

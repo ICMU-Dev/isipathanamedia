@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import TabHeader from "../../../components/admin/TabHeader";
-import { Zap, MessageSquarePlus, Check, Palette, Wand2, RotateCcw, Loader2, ChevronDown } from "lucide-react";
+import { Zap, MessageSquarePlus, Check, Palette, Wand2, RotateCcw, Loader2, ChevronDown, Sparkles, CheckCircle2 } from "lucide-react";
 import { Switch } from "../../../components/motion/switch";
 import { useTheme, DEFAULT_CUSTOM_THEME, THEMES } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
@@ -8,6 +8,7 @@ import { ColorPicker } from "../../../components/admin/ColorPicker";
 
 // ─── Suggested custom combos ───
 const SUGGESTED_COMBOS = [
+  { name: "ICMU v2", bg: "#010F0B", cardBg: "#011D17", accent: "#1EB957", textPrimary: "#D1FAE5", textSecondary: "#8FAEA0" },
   { name: "Stealth", bg: "#000000", cardBg: "#0a0a0a", accent: "#ffffff", textPrimary: "#ffffff", textSecondary: "#888888" },
   { name: "Midnight", bg: "#020617", cardBg: "#0f172a", accent: "#3b82f6", textPrimary: "#f8fafc", textSecondary: "#94a3b8" },
   { name: "Lava", bg: "#0a0000", cardBg: "#140505", accent: "#ef4444", textPrimary: "#fca5a5", textSecondary: "#991b1b" },
@@ -195,6 +196,52 @@ const AppearanceTab = ({
           <span className="text-[8px] font-black uppercase tracking-widest bg-theme-accent/ text-[var(--accent)] px-2 py-0.5 rounded-full border border-theme-accent/">
             Beta
           </span>
+        </div>
+
+        {/* ─── OFFICIAL V2 BRANDING SHOWCASE (MINIMAL) ─── */}
+        <div className="relative rounded-2xl bg-[#011D17] border border-[#D1FAE5]/10 p-4 sm:p-5 transition-all">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase text-[#1EB957]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1EB957]" />
+                  Brand Identity v2
+                </span>
+                <span className="text-[10px] font-mono text-[#8FAEA0]/60">
+                  Montserrat
+                </span>
+              </div>
+              <h4 className="text-sm sm:text-base font-bold text-[#D1FAE5] tracking-tight">
+                No Sacrifice, No Victory
+              </h4>
+              <p className="text-[11px] sm:text-xs text-[#8FAEA0] leading-relaxed max-w-xl">
+                Official ICMU Studio v2 — forest void (<span className="font-mono text-[#D1FAE5]/70">#010F0B</span>), deep emerald (<span className="font-mono text-[#D1FAE5]/70">#011D17</span>), mint cream (<span className="font-mono text-[#D1FAE5]/70">#D1FAE5</span>), and balanced green (<span className="font-mono text-[#D1FAE5]/70">#178740</span>).
+              </p>
+            </div>
+
+            {/* Minimal Activate Button */}
+            <button
+              type="button"
+              onClick={() => handleThemeSelect("icmu_v2")}
+              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                themeId === "icmu_v2"
+                  ? "bg-[#178740]/20 text-[#D1FAE5] border border-[#178740]/50"
+                  : "bg-[#178740] text-white hover:bg-[#1eb957] border border-transparent shadow-sm"
+              }`}
+            >
+              {themeId === "icmu_v2" ? (
+                <>
+                  <CheckCircle2 size={14} className="text-[#1EB957]" />
+                  <span>Active Theme</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} />
+                  <span>Apply Theme</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* All preset themes as swatches in a scrollable row */}

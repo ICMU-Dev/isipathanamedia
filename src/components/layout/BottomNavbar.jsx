@@ -16,6 +16,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
 import { useNotification } from "../../context/NotificationContext";
 import GlassSurface from "../ui/GlassSurface";
+import { UserAvatar } from "../ui/avatar";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import { MorphingModal } from "../motion/morphing-modal";
@@ -63,9 +64,10 @@ const BottomNavbar = () => {
   const showNewsBadge = isAdm && pendingCount > 0;
 
   const unreadFeedbacks =
-    notifications?.filter((n) => n.isFeedback && !n.read).length || 0;
+    notifications?.filter((n) => (n.isFeedback || n.category === "feedback") && !n.read).length || 0;
   const unreadMessages =
-    notifications?.filter((n) => !n.isFeedback && !n.read).length || 0;
+    notifications?.filter((n) => (n.isInbox || n.category === "inbox") && !n.read).length || 0;
+
 
   const { isStandalone, isInstallable, promptInstall } = usePWAInstall();
   const showSettingsBadge = isAdm && unreadFeedbacks > 0;
@@ -107,16 +109,14 @@ const BottomNavbar = () => {
     {
       name: "Profile",
       path: `${basePath}/dashboard/profile`,
-      icon:
-        user?.avatarUrl || user?.user_metadata?.avatar_url ? (
-          <img
-            src={user.avatarUrl || user?.user_metadata?.avatar_url}
-            alt="Profile"
-            className="w-[18px] h-[18px] rounded-full object-cover border-2 border-white/40 shadow-sm"
-          />
-        ) : (
-          <UserIcon size={18} />
-        ),
+      icon: (
+        <UserAvatar
+          user={user}
+          size="xs"
+          className="w-[18px] h-[18px] border-2 border-white/40 shadow-sm"
+          fallback={<UserIcon size={12} />}
+        />
+      ),
       roles: ["writer", "admin", "super_admin"],
     },
     {

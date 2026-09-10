@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useAdminPresence } from "../../hooks/useAdminPresence";
 import { Users } from "lucide-react";
+import { AvatarGroup, AvatarGroupCount, UserAvatar } from "../ui/avatar";
 
 const ActiveAdmins = ({
   isCollapsed = false,
@@ -42,46 +43,26 @@ const ActiveAdmins = ({
           isCollapsed ? "justify-center w-full" : ""
         }`}
         title="Active Admins">
-        <div className="flex -space-x-2">
-          {displayAdmins.map((admin, idx) => {
-            const pic =
-              admin.avatarUrl || admin.profile || admin.profile_picture;
-            return (
-              <div
-                key={admin.id || idx}
-                className="w-8 h-8 rounded-full bg-theme-card border-2 border-admin-bg flex items-center justify-center text-[10px] font-bold text-theme-primary opacity-80 relative group-hover:border-white/20 transition-colors shadow-sm"
-                style={{ zIndex: 10 - idx }}>
-                {pic ? (
-                  <img
-                    src={pic}
-                    alt={admin.name || "Admin"}
-                    width={28}
-                    height={28}
-                    loading="lazy"
-                    className="w-full h-full rounded-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                      e.currentTarget.nextSibling.style.display = "flex";
-                    }}
-                  />
-                ) : null}
-                <div
-                  className="w-full h-full flex items-center justify-center"
-                  style={{ display: pic ? "none" : "flex" }}>
-                  {admin.name ? admin.name.charAt(0).toUpperCase() : "A"}
-                </div>
-                <div className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-[var(--accent)] border border-admin-bg" />
-              </div>
-            );
-          })}
+        <AvatarGroup>
+          {displayAdmins.map((admin, idx) => (
+            <UserAvatar
+              key={admin.id || idx}
+              user={admin}
+              size="default"
+              showBadge
+              badgeClassName="bg-[var(--accent)] border-admin-bg"
+              className="border-2 border-admin-bg bg-theme-card text-theme-primary opacity-80 group-hover:border-white/20 transition-colors shadow-sm"
+              style={{ zIndex: 10 - idx }}
+            />
+          ))}
           {remaining > 0 && (
-            <div
-              className="w-8 h-8 rounded-full bg-[var(--admin-border)] border-2 border-[#0c0c0c] flex items-center justify-center text-[9px] font-bold text-theme-primary opacity-60"
-              style={{ zIndex: 10 - maxAvatars }}>
-              +{remaining}
-            </div>
+            <AvatarGroupCount
+              count={remaining}
+              size="default"
+              style={{ zIndex: 10 - maxAvatars }}
+            />
           )}
-        </div>
+        </AvatarGroup>
 
         {!isCollapsed && !isMobile && (
           <div className="ml-2.5 hidden sm:flex flex-col items-start opacity-60 group-hover:opacity-100 transition-opacity">
@@ -98,68 +79,63 @@ const ActiveAdmins = ({
       {/* Dropdown Menu */}
       {isOpen && (
         <div
-          className={`absolute z-[100] py-2 min-w-[220px] rounded-2xl border border-white/5 bg-[var(--admin-card-bg)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)] animate-liquid-reveal ${
+          className={`absolute z-[100] min-w-[220px] animate-liquid-reveal ${
             isMobile
-              ? "right-0 top-full mt-3"
-              : isCollapsed
-                ? "left-full ml-4 bottom-0"
-                : "left-0 bottom-full mb-2"
-          } ${isMobile ? "origin-top-right" : isCollapsed ? "origin-bottom-left" : "origin-bottom-left"}`}>
-          <div className="px-3 pb-2 mb-2 border-b border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users size={12} className="text-white/40" />
-              <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
-                Active Admins
+              ? "right-0 top-full mt-2.5 origin-top-right"
+              : "left-full ml-6 bottom-0 origin-bottom-left"
+          }`}>
+          {/* Arrow Notch / Speech Bubble Pointer */}
+          {isMobile ? (
+            <div className="absolute -top-1.5 right-3.5 w-3 h-3 rotate-45 bg-[var(--admin-card-bg,#121216)] border-t border-l border-[var(--admin-border,rgba(255,255,255,0.08))] pointer-events-none z-20" />
+          ) : (
+            <div className="absolute -left-1.5 bottom-3.5 w-3 h-3 rotate-45 bg-[var(--admin-card-bg,#121216)] border-b border-l border-[var(--admin-border,rgba(255,255,255,0.08))] pointer-events-none z-20" />
+          )}
+
+          {/* Popover Inner Card */}
+          <div className="relative z-10 w-full py-2 rounded-2xl border border-[var(--admin-border,rgba(255,255,255,0.08))] bg-[var(--admin-card-bg,#121216)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur-2xl overflow-hidden font-sans">
+            <div className="px-3 pb-2 mb-2 border-b border-[var(--admin-border,rgba(255,255,255,0.06))] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users size={12} className="text-theme-accent" />
+                <span className="text-[10px] font-bold text-[var(--admin-text-secondary,#a1a1aa)] uppercase tracking-wider">
+                  Active Admins
+                </span>
+              </div>
+              <span className="px-1.5 py-0.2 rounded-2xl text-[8.5px] font-bold bg-theme-accent/20 text-theme-accent border border-theme-accent/30">
+                {onlineAdmins.length}
               </span>
             </div>
-          </div>
 
-          <div className="max-h-[250px] overflow-y-auto hide-scrollbar px-2 space-y-1">
-            {onlineAdmins.map((admin) => {
-              const pic =
-                admin.avatarUrl || admin.profile || admin.profile_picture;
-              const isSelf = admin.id === user?.id;
+            <div className="max-h-[250px] overflow-y-auto hide-scrollbar px-2 space-y-1">
+              {onlineAdmins.map((admin) => {
+                const isSelf = admin.id === user?.id;
 
-              return (
-                <div
-                  key={admin.id}
-                  className="flex items-center justify-between gap-2.5 px-2 py-1.5 rounded-2xl hover:bg-white/10 opacity-90 transition-colors group">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-white opacity-70 shrink-0 relative">
-                      {pic ? (
-                        <img
-                          src={pic}
-                          alt={admin.name || "Admin"}
-                          width={24}
-                          height={24}
-                          loading="lazy"
-                          className="w-full h-full rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                            e.currentTarget.nextSibling.style.display = "flex";
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className="w-full h-full flex items-center justify-center"
-                        style={{ display: pic ? "none" : "flex" }}>
-                        {admin.name ? admin.name.charAt(0).toUpperCase() : "A"}
+                return (
+                  <div
+                    key={admin.id}
+                    className="flex items-center justify-between gap-2.5 px-2 py-1.5 rounded-2xl hover:bg-white/10 opacity-90 transition-colors group">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <UserAvatar
+                        user={admin}
+                        size="sm"
+                        shape="rounded"
+                        showBadge
+                        badgeClassName="bg-theme-accent shadow-[0_0_6px_rgba(var(--accent-rgb,75,196,51),0.8)]"
+                        className="bg-white/5 border border-white/10 shrink-0"
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[11px] font-medium text-[var(--admin-text-primary,#fff)] opacity-90 truncate">
+                          {admin.name}{" "}
+                          {isSelf && <span className="text-white/30">(You)</span>}
+                        </span>
+                        <span className="text-[9px] text-[var(--admin-text-secondary,#a1a1aa)] capitalize truncate">
+                          {admin.role || "Admin"}
+                        </span>
                       </div>
-                      <div className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] font-medium text-white opacity-90 truncate">
-                        {admin.name}{" "}
-                        {isSelf && <span className="text-white/30">(You)</span>}
-                      </span>
-                      <span className="text-[9px] text-white/50 capitalize truncate">
-                        {admin.role || "Admin"}
-                      </span>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

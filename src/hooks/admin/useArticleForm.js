@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
@@ -8,6 +8,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import { ICMU_AUTHOR_NAME, isInstitutionAuthor } from "../../utils/authorUtils";
+import { isAdmin as checkIsAdmin, isSuperAdmin as checkIsSuperAdmin } from "../../utils/roles";
 
 const ARTICLE_LIMITS = {
   title: 100,
@@ -20,16 +21,13 @@ const ARTICLE_LIMITS = {
 export const useArticleForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { news, addNews, updateNews, uploadImage, compressImage, fetchNews } =
+  const { news, addNews, updateNews, uploadImage, compressImage, fetchNews, fetchAdminData } =
     useData();
   const { user } = useAuth();
 
-  const userRole = user?.role?.toLowerCase();
-  const isSuperAdmin =
-    userRole === "super_admin" ||
-    userRole === "super-admin" ||
-    userRole === "superadmin";
-  const isAdmin = isSuperAdmin || userRole === "admin";
+  const userRole = user?.role;
+  const isSuperAdmin = checkIsSuperAdmin(userRole);
+  const isAdmin = checkIsAdmin(userRole);
 
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
@@ -68,6 +66,27 @@ export const useArticleForm = () => {
   // Cropper State
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
+  const imageToCropRef = useRef(null);
+
+  useEffect(() => {
+    imageToCropRef.current = imageToCrop;
+  }, [imageToCrop]);
+
+  useEffect(() => {
+    return () => {
+      if (imageToCropRef.current) {
+        URL.revokeObjectURL(imageToCropRef.current);
+      }
+    };
+  }, []);
+
+  const closeCropModal = () => {
+    setCropModalOpen(false);
+    if (imageToCrop) {
+      URL.revokeObjectURL(imageToCrop);
+    }
+    setImageToCrop(null);
+  };
 
   const editor = useEditor({
     extensions: [
@@ -99,8 +118,12 @@ export const useArticleForm = () => {
   });
 
   useEffect(() => {
-    fetchNews();
-  }, [fetchNews]);
+    if (fetchAdminData) {
+      fetchAdminData();
+    } else {
+      fetchNews(false, 0, 1000, true);
+    }
+  }, [fetchAdminData, fetchNews]);
 
   useEffect(() => {
     if (id && news.length > 0) {
@@ -110,6 +133,12 @@ export const useArticleForm = () => {
 
         if (!isAdmin && !authorMatch) {
           toast.error("You are not authorized to edit this article.");
+          navigate(-1);
+          return;
+        }
+
+        if (!isAdmin && article.status === "pending" && !article.needs_attention) {
+          toast.error("This article is locked in the review queue. You cannot edit it until reviewed by an administrator.");
           navigate(-1);
           return;
         }
@@ -148,6 +177,9 @@ export const useArticleForm = () => {
       return;
     }
 
+    if (imageToCrop) {
+      URL.revokeObjectURL(imageToCrop);
+    }
     const localUrl = URL.createObjectURL(file);
     setImageToCrop(localUrl);
     setCropModalOpen(true);
@@ -156,6 +188,9 @@ export const useArticleForm = () => {
 
   const handleCropComplete = async (croppedFile) => {
     setCropModalOpen(false);
+    if (imageToCrop) {
+      URL.revokeObjectURL(imageToCrop);
+    }
     setImageToCrop(null);
     setUploading(true);
 
@@ -295,9 +330,7 @@ export const useArticleForm = () => {
         const originalArticle = news.find(n => n.id.toString() === id);
         if (originalArticle) {
             payload.submitted_by = originalArticle.submitted_by;
-            payload.author = isAnonymous
-              ? ICMU_AUTHOR_NAME
-              : originalArticle.author || formData.author;
+            payload.author = originalArticle.author || formData.author;
         }
       }
 
@@ -345,6 +378,7 @@ export const useArticleForm = () => {
     setCropModalOpen,
     imageToCrop,
     setImageToCrop,
+    closeCropModal,
     editor,
     handleFileUpload,
     handleCropComplete,

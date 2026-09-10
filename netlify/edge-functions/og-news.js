@@ -11,10 +11,8 @@
  * before returning it. Regular users get the normal SPA experience.
  */
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
-const SITE_URL = 'https://isipathanamedia.online';
-const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL') || '';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_PUBLISHABLE_KEY') || '';
 
 // Bot/crawler user-agent patterns
 const BOT_PATTERNS = [
@@ -89,12 +87,13 @@ async function fetchArticle(articleId) {
 /**
  * Build a minimal HTML page with OG meta tags for crawlers.
  */
-function buildOGPage(article) {
+function buildOGPage(article, siteUrl) {
   const title = article.title || 'News Article | Isipathana College Media Unit';
   const cleanContent = stripHtml(article.content);
   const description = cleanContent.length > 160 ? cleanContent.slice(0, 160) : cleanContent || 'Read the latest news from Isipathana College Media Unit.';
-  const image = article.image || DEFAULT_IMAGE;
-  const canonicalUrl = `${SITE_URL}/news/${article.id}`;
+  const defaultImage = `${siteUrl}/og-image.png`;
+  const image = article.image || defaultImage;
+  const canonicalUrl = `${siteUrl}/news/${article.id}`;
   const author = article.author || 'Isipathana College Media Unit';
 
   let tagsHtml = '';
@@ -197,7 +196,8 @@ export default async function handler(request, context) {
     return context.next();
   }
 
-  const html = buildOGPage(article);
+  const siteUrl = Deno.env.get('URL') || Deno.env.get('SITE_URL') || url.origin;
+  const html = buildOGPage(article, siteUrl);
 
   return new Response(html, {
     status: 200,

@@ -1,0 +1,55 @@
+[
+  {
+    "id": "v2-0-0",
+    "version": "2.0.0",
+    "title": "ICMU Web v2",
+    "subtitle": "Feature Release",
+    "badge": "FEATURE RELEASE",
+    "desc": "ICMU Web platform featuring the all-new V2 design system, a real-time notification hub, masonry article galleries, privacy-first GA4 analytics, blazing-fast data caching, and a zero-leak edge security architecture.",
+    "date": "Sep 10, 2026",
+    "isoDate": "2026-09-10",
+    "isMajor": true,
+    "steps": [
+      {
+        "t": "ICMU V2 Design System",
+        "d": "Brand-new liquid UI theme with fluid micro-interactions, responsive form controls, and modern dark aesthetics"
+      },
+      {
+        "t": "Centralized Notification Hub",
+        "d": "Real-time alert center with audio chime, category filtering (Inbox, Articles, Feedback, System), and unread tracking."
+      },
+      {
+        "t": "Masonry Article Media",
+        "d": "Dynamic image masonry grid for high-impact photo journalism and article media."
+      },
+      {
+        "t": "GA4 Article Analytics",
+        "d": "Real-time view counts and reader engagement powered by secure edge functions."
+      },
+      {
+        "t": "Platform Documentation",
+        "d": "Integrated guides, developer references, and operational docs."
+      },
+      {
+        "t": "Zero-Leak Secret Management",
+        "d": "Hardcoded API keys, private tokens, and environment secrets completely removed from client bundles and routed through hardened Supabase Edge Functions"
+      },
+      {
+        "t": "Avatar & Profile Pictures",
+        "d": "Fixed loading deadlocks and fallback letter flickers across the top bar, sidebar, active admins, and mobile nav"
+      },
+      {
+        "t": "Article System",
+        "d": "Streamlined editor lifecycle, auto-saving, and draft workflows."
+      },
+      {
+        "t": "Admin & Broadcaster Roles",
+        "d": "Resolved role redirects, dashboard permission guards, and broadcaster view boundaries."
+      },
+      {
+        "t": "Release Manager",
+        "d": "Automated SemVer release pipeline synchronized directly with CHANGELOG.md and live system notifications"
+      }
+    ]
+  }
+]

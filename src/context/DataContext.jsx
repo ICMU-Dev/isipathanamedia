@@ -28,9 +28,6 @@ export const DataProvider = ({ children }) => {
   const [assets, setAssets] = useState({});
   const { user } = useAuth();
   const [nethinetheraSchools, setNethinetheraSchools] = useState([]);
-  const [nethinetheraAgenda, setNethinetheraAgenda] = useState([]);
-  const [nethinetheraVotes, setNethinetheraVotes] = useState([]);
-  const [nethinetheraSeating, setNethinetheraSeating] = useState([]);
   const [siteConfig, setSiteConfig] = useState({
     socialLinks: {
       facebook: "https://facebook.com",
@@ -38,16 +35,6 @@ export const DataProvider = ({ children }) => {
       youtube: "https://youtube.com",
       twitter: "https://twitter.com",
     },
-    sectionOrder: [
-      "home",
-      "partnerLogos",
-      "about",
-      "nethinethera",
-      "news",
-      "services",
-      "team",
-      "contact",
-    ],
     contactDetails: {
       address: "Isipathana College, Colombo 05, Sri Lanka",
       email: "icmediaunit@gmail.com",
@@ -72,7 +59,6 @@ export const DataProvider = ({ children }) => {
     nethinethera: {
       registrationOpen: true,
       maxCapacity: 100,
-      emergencyNotice: "",
     },
     liveStream: {
       platform: "youtube",
@@ -89,8 +75,12 @@ export const DataProvider = ({ children }) => {
     },
   });
 
-  // Track which data has been fetched to avoid re-fetching
-  const fetchedRef = useRef({ news: false, team: false, events: false, config: false, messages: false, webUsers: false });
+  // Track which data has been fetched to avoid redundant calls while keeping data fresh
+  const fetchedRef = useRef({ news: false, team: false, config: false, messages: false, webUsers: false, adminData: false });
+  const fetchedAtRef = useRef({ news: 0, team: 0, config: 0, messages: 0, webUsers: 0, adminData: 0 });
+
+  // Cache freshness helper: returns true if data is older than ttlMs
+  const isStale = (key, ttlMs = 60_000) => (Date.now() - (fetchedAtRef.current[key] || 0)) > ttlMs;
 
   // Stats for Admin Dashboard
   const stats = useMemo(() => ({
@@ -99,11 +89,11 @@ export const DataProvider = ({ children }) => {
     totalServices: 3,
     totalMessages: messages.length,
     totalViews: 12450,
-  }), [news.length, team, messages.length]);
+  }), [news.length, team?.length, messages.length]);
 
-  // Fetch public data (news, team, events, assets/config)
+  // Fetch public data (news, team, assets/config)
   const fetchConfig = useCallback(async (force = false) => {
-    if (fetchedRef.current.config && !force) return;
+    if (fetchedRef.current.config && !force && !isStale('config', 120_000)) return;
     try {
       const { data: assetsData, error } = await supabase.from("assets").select("key, url");
       if (error) throw error;
@@ -119,7 +109,6 @@ export const DataProvider = ({ children }) => {
                 ...remoteConfigFound,
                 socialLinks: { ...prev.socialLinks, ...remoteConfigFound.socialLinks },
                 contactDetails: { ...prev.contactDetails, ...remoteConfigFound.contactDetails },
-                sectionOrder: remoteConfigFound.sectionOrder || prev.sectionOrder,
               }));
             } catch (e) { console.error("Config parse error:", e); }
           } else {
@@ -128,6 +117,7 @@ export const DataProvider = ({ children }) => {
         });
         setAssets((prev) => ({ ...prev, ...assetMap }));
         fetchedRef.current.config = true;
+        fetchedAtRef.current.config = Date.now();
       }
     } catch (err) {
       console.error("Config fetch error:", err.message);
@@ -144,14 +134,26 @@ export const DataProvider = ({ children }) => {
     return item;
   };
 
-  const fetchNews = useCallback(async (force = false, page = 0, limit = 30) => {
-    if (fetchedRef.current.news && !force && page === 0) return;
+  const lastNewsLimitRef = useRef(0);
+  const lastNewsAdminRef = useRef(false);
+  const fetchNews = useCallback(async (force = false, page = 0, limit = 5, isAdmin = false) => {
+    // If full admin dataset is already in memory, avoid overwriting it with a small public slice unless explicitly forced
+    if (lastNewsAdminRef.current && !isAdmin && !force) return;
+
+    const needsMoreItems = page === 0 && limit > lastNewsLimitRef.current;
+    const switchedAdminMode = page === 0 && isAdmin !== lastNewsAdminRef.current;
+    if (fetchedRef.current.news && !force && !isStale('news', 60_000) && page === 0 && !needsMoreItems && !switchedAdminMode) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("news")
         .select("id, title, content, image, date, category, author, tags, type, status, submitted_by, original_link, created_at, visibility, needs_attention, review_notes")
-        .order("date", { ascending: false })
-        .range(page * limit, (page + 1) * limit - 1);
+        .order("date", { ascending: false });
+
+      if (!isAdmin) {
+        query = query.eq("status", "published").eq("visibility", "public");
+      }
+
+      const { data, error } = await query.range(page * limit, (page + 1) * limit - 1);
         
       if (error) throw error;
       if (data) {
@@ -162,14 +164,19 @@ export const DataProvider = ({ children }) => {
 
         if (page === 0) {
           setNews(patchedData);
+          lastNewsLimitRef.current = limit;
+          lastNewsAdminRef.current = isAdmin;
         } else {
           setNews(prev => {
-            const newMap = new Map(prev.map(item => [item.id, item]));
-            patchedData.forEach(item => newMap.set(item.id, item));
+            const newMap = new Map(prev.map(item => [String(item.id), item]));
+            patchedData.forEach(item => newMap.set(String(item.id), item));
             return Array.from(newMap.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
           });
         }
-        if (page === 0) fetchedRef.current.news = true;
+        if (page === 0) {
+          fetchedRef.current.news = true;
+          fetchedAtRef.current.news = Date.now();
+        }
       }
     } catch (err) {
       console.error("News fetch error:", err.message);
@@ -186,33 +193,34 @@ export const DataProvider = ({ children }) => {
         
       if (error) throw error;
       if (data) {
-        // Access Control
-        // Public: Everyone
-        // Unlisted: Anyone with the direct link
-        // Private: Logged-in roles only (super admin, admin, writer, broadcaster, etc.)
-        // Draft/Pending: Admin or author only
+        const isSuspended = Boolean(
+          currentUser && (
+            currentUser.is_active === false ||
+            currentUser.status === "suspended" ||
+            currentUser.is_suspended === true ||
+            currentUser.active === false
+          )
+        );
+
         let isAuthorized = false;
         
-        if (currentUser) {
+        // Only non-suspended authenticated users can exercise role/author privileges
+        if (currentUser && !isSuspended) {
           const userRole = currentUser?.role;
           if (checkIsAdmin(userRole)) {
-            // Admins & super-admins can view all statuses and visibilities
             isAuthorized = true;
           } else if (currentUser.id === data.submitted_by) {
-            // The author can view their own article regardless of status/visibility
             isAuthorized = true;
           }
         }
         
+        // Published visibility check
         if (!isAuthorized && data.status === "published") {
           if (data.visibility === "public") {
-            // Public: visible to all
             isAuthorized = true;
-          } else if (data.visibility === "unlisted") {
-            // Unlisted: visible to anyone who has the direct link
+          } else if (data.visibility === "unlisted" && !isSuspended) {
             isAuthorized = true;
-          } else if (data.visibility === "private" && currentUser) {
-            // Private: visible to any logged-in user with an account/role
+          } else if (data.visibility === "private" && currentUser && !isSuspended) {
             isAuthorized = true;
           }
         }
@@ -221,8 +229,12 @@ export const DataProvider = ({ children }) => {
 
         data = patchImageUrl(data);
         setNews(prev => {
-          const exists = prev.find(n => n.id === data.id);
-          if (exists) return prev;
+          const index = prev.findIndex(n => String(n.id) === String(data.id));
+          if (index !== -1) {
+            const next = [...prev];
+            next[index] = { ...next[index], ...data };
+            return next;
+          }
           return [...prev, data].sort((a, b) => new Date(b.date) - new Date(a.date));
         });
         return data;
@@ -235,13 +247,14 @@ export const DataProvider = ({ children }) => {
   }, []);
 
   const fetchTeam = useCallback(async (force = false) => {
-    if (fetchedRef.current.team && !force) return;
+    if (fetchedRef.current.team && !force && !isStale('team', 120_000)) return;
     try {
       const { data, error } = await supabase.from("team").select("id, name, role, image").order("id", { ascending: true });
       if (error) throw error;
       if (data) {
         setTeam(data);
         fetchedRef.current.team = true;
+        fetchedAtRef.current.team = Date.now();
       }
     } catch (err) {
       console.error("Team fetch error:", err.message);
@@ -249,21 +262,24 @@ export const DataProvider = ({ children }) => {
   }, []);
 
   const fetchWebUsers = useCallback(async (force = false) => {
-    if (fetchedRef.current.webUsers && !force) return;
+    if (!user || (!checkIsAdmin(user?.role) && !checkIsWriter(user?.role))) return;
+    if (fetchedRef.current.webUsers && !force && !isStale('webUsers', 60_000)) return;
     try {
       const { data, error } = await supabase.from("users").select("id, full_name, role, index_number, avatar_url, email").order("full_name", { ascending: true });
       if (error) throw error;
       if (data) {
         setWebUsers(data);
         fetchedRef.current.webUsers = true;
+        fetchedAtRef.current.webUsers = Date.now();
       }
     } catch (err) {
       console.error("Web Users fetch error:", err.message);
     }
-  }, []);
+  }, [user]);
 
   const fetchMessages = useCallback(async (force = false) => {
-    if (fetchedRef.current.messages && !force) return;
+    if (!user || !checkIsAdmin(user?.role)) return;
+    if (fetchedRef.current.messages && !force && !isStale('messages', 30_000)) return;
     try {
       const { data, error } = await supabase
         .from("messages")
@@ -280,30 +296,82 @@ export const DataProvider = ({ children }) => {
       if (data) {
         setMessages(data);
         fetchedRef.current.messages = true;
+        fetchedAtRef.current.messages = Date.now();
       }
     } catch (err) {
       if (!err.message?.includes("schema cache") && err.code !== "PGRST205") {
         console.warn("Messages fetch note:", err.message);
       }
     }
-  }, []);
+  }, [user]);
+
+  const isFetchingAdminRef = useRef(false);
+  const fetchedAdminRef = useRef(false);
+  const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
+
+  const fetchAdminData = useCallback(async (force = false) => {
+    if (!user) return;
+    const isAdm = checkIsAdmin(user?.role);
+    const isWrit = checkIsWriter(user?.role);
+    if (!isAdm && !isWrit) return;
+
+    if (fetchedAdminRef.current && !force && !isStale('adminData', 60_000)) return;
+    if (isFetchingAdminRef.current) return;
+
+    isFetchingAdminRef.current = true;
+    setIsAdminDataLoading(true);
+    try {
+      const tasks = [
+        fetchNews(force, 0, 1000, true),
+      ];
+
+      if (isAdm) {
+        tasks.push(fetchMessages(force));
+      }
+      tasks.push(fetchWebUsers(force));
+
+      await Promise.allSettled(tasks);
+      fetchedAdminRef.current = true;
+      fetchedRef.current.adminData = true;
+      fetchedAtRef.current.adminData = Date.now();
+    } catch (err) {
+      console.error("[DataContext] Admin data fetch error:", err);
+    } finally {
+      isFetchingAdminRef.current = false;
+      setIsAdminDataLoading(false);
+    }
+  }, [user, fetchNews, fetchMessages, fetchWebUsers]);
+
+  // Clean up admin datasets on logout
+  useEffect(() => {
+    if (!user) {
+      setMessages([]);
+      setWebUsers([]);
+      fetchedRef.current.messages = false;
+      fetchedRef.current.webUsers = false;
+      fetchedRef.current.adminData = false;
+      fetchedAdminRef.current = false;
+      if (lastNewsAdminRef.current) {
+        lastNewsAdminRef.current = false;
+        fetchNews(true, 0, 5, false);
+      }
+    }
+  }, [user, fetchNews]);
 
   const fetchData = useCallback(async (force = false) => {
     setIsFetching(true);
-    await Promise.allSettled([
-      fetchNews(force),
+    // Only fetch public landing data: 5 latest articles, team, and assets/config
+    const tasks = [
+      fetchNews(force, 0, 5),
       fetchTeam(force),
       fetchConfig(force),
-      fetchMessages(force),
-      fetchWebUsers(force),
-    ]);
+    ];
+    await Promise.allSettled(tasks);
     setIsFetching(false);
     setLoading(false);
-  }, [fetchNews, fetchTeam, fetchConfig, fetchMessages, fetchWebUsers]);
+  }, [fetchNews, fetchTeam, fetchConfig]);
 
   useEffect(() => {
-    // Eagerly fetch all essential dashboard data on initial load.
-    // This removes the need for individual pages to call fetchData().
     fetchData();
   }, [fetchData]);
 
@@ -311,26 +379,19 @@ export const DataProvider = ({ children }) => {
   const lastFocusFetchRef = useRef(Date.now());
   useEffect(() => {
     const handleSyncOnFocus = () => {
-      // Throttle to at most once every 30 seconds to prevent hammering DB on rapid tab switches
       const now = Date.now();
-      if (now - lastFocusFetchRef.current > 30_000) {
+      if (now - lastFocusFetchRef.current > 60_000 && document.visibilityState === "visible") {
         lastFocusFetchRef.current = now;
-        fetchData(true);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        handleSyncOnFocus();
+        fetchData(false);
       }
     };
 
     window.addEventListener("focus", handleSyncOnFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleSyncOnFocus);
 
     return () => {
       window.removeEventListener("focus", handleSyncOnFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleSyncOnFocus);
     };
   }, [fetchData]);
 
@@ -360,7 +421,6 @@ export const DataProvider = ({ children }) => {
                 ...remoteConfigFound,
                 socialLinks: { ...prev.socialLinks, ...remoteConfigFound.socialLinks },
                 contactDetails: { ...prev.contactDetails, ...remoteConfigFound.contactDetails },
-                sectionOrder: remoteConfigFound.sectionOrder || prev.sectionOrder,
               }));
             } catch (e) {
               console.error("Realtime site config parse error:", e);
@@ -377,15 +437,16 @@ export const DataProvider = ({ children }) => {
           table: "news",
         },
         (payload) => {
+          fetchedAtRef.current.news = Date.now();
           if (payload.eventType === "DELETE") {
-            setNews((prev) => prev.filter((n) => n.id !== payload.old.id));
+            setNews((prev) => prev.filter((n) => String(n.id) !== String(payload.old?.id)));
             return;
           }
           if (payload.eventType === "INSERT") {
             if (payload.new) {
               const patched = patchImageUrl(payload.new);
               setNews((prev) => {
-                if (prev.some((n) => n.id === patched.id)) return prev;
+                if (prev.some((n) => String(n.id) === String(patched.id))) return prev;
                 return [patched, ...prev].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
               });
             }
@@ -394,7 +455,13 @@ export const DataProvider = ({ children }) => {
           if (payload.eventType === "UPDATE") {
             if (payload.new && payload.new.title) {
               const patched = patchImageUrl(payload.new);
-              setNews((prev) => prev.map((n) => (n.id === patched.id ? { ...n, ...patched } : n)));
+              setNews((prev) => {
+                const exists = prev.some((n) => String(n.id) === String(patched.id));
+                if (exists) {
+                  return prev.map((n) => (String(n.id) === String(patched.id) ? { ...n, ...patched } : n));
+                }
+                return [patched, ...prev].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+              });
             } else if (payload.new?.id) {
               // If large text truncated payload.new, fetch full record
               supabase
@@ -405,7 +472,13 @@ export const DataProvider = ({ children }) => {
                 .then(({ data }) => {
                   if (data) {
                     const patched = patchImageUrl(data);
-                    setNews((prev) => prev.map((n) => (n.id === patched.id ? { ...n, ...patched } : n)));
+                    setNews((prev) => {
+                      const exists = prev.some((n) => String(n.id) === String(patched.id));
+                      if (exists) {
+                        return prev.map((n) => (String(n.id) === String(patched.id) ? { ...n, ...patched } : n));
+                      }
+                      return [patched, ...prev].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+                    });
                   }
                 })
                 .catch(() => {});
@@ -423,16 +496,17 @@ export const DataProvider = ({ children }) => {
           table: "team",
         },
         (payload) => {
+          fetchedAtRef.current.team = Date.now();
           setTeam((prev) => {
             if (payload.eventType === "INSERT") {
-              if (prev.some((t) => t.id === payload.new.id)) return prev;
+              if (prev.some((t) => String(t.id) === String(payload.new.id))) return prev;
               return [...prev, payload.new].sort((a, b) => Number(a.id) - Number(b.id));
             }
             if (payload.eventType === "UPDATE") {
-              return prev.map((t) => (t.id === payload.new.id ? { ...t, ...payload.new } : t)).sort((a, b) => Number(a.id) - Number(b.id));
+              return prev.map((t) => (String(t.id) === String(payload.new.id) ? { ...t, ...payload.new } : t)).sort((a, b) => Number(a.id) - Number(b.id));
             }
             if (payload.eventType === "DELETE") {
-              return prev.filter((t) => t.id !== payload.old.id);
+              return prev.filter((t) => String(t.id) !== String(payload.old?.id));
             }
             return prev;
           });
@@ -447,16 +521,17 @@ export const DataProvider = ({ children }) => {
           table: "messages",
         },
         (payload) => {
+          fetchedAtRef.current.messages = Date.now();
           setMessages((prev) => {
             if (payload.eventType === "INSERT") {
-              if (prev.some((m) => m.id === payload.new.id)) return prev;
+              if (prev.some((m) => String(m.id) === String(payload.new.id))) return prev;
               return [payload.new, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             }
             if (payload.eventType === "UPDATE") {
-              return prev.map((m) => (m.id === payload.new.id ? { ...m, ...payload.new } : m));
+              return prev.map((m) => (String(m.id) === String(payload.new.id) ? { ...m, ...payload.new } : m));
             }
             if (payload.eventType === "DELETE") {
-              return prev.filter((m) => m.id !== payload.old.id);
+              return prev.filter((m) => String(m.id) !== String(payload.old?.id));
             }
             return prev;
           });
@@ -471,16 +546,17 @@ export const DataProvider = ({ children }) => {
           table: "users",
         },
         (payload) => {
+          fetchedAtRef.current.webUsers = Date.now();
           setWebUsers((prev) => {
             if (payload.eventType === "INSERT") {
-              if (prev.some((u) => u.id === payload.new.id)) return prev;
+              if (prev.some((u) => String(u.id) === String(payload.new.id))) return prev;
               return [...prev, payload.new].sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
             }
             if (payload.eventType === "UPDATE") {
-              return prev.map((u) => (u.id === payload.new.id ? { ...u, ...payload.new } : u)).sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+              return prev.map((u) => (String(u.id) === String(payload.new.id) ? { ...u, ...payload.new } : u)).sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
             }
             if (payload.eventType === "DELETE") {
-              return prev.filter((u) => u.id !== payload.old.id);
+              return prev.filter((u) => String(u.id) !== String(payload.old?.id));
             }
             return prev;
           });
@@ -527,9 +603,10 @@ export const DataProvider = ({ children }) => {
     if (!error && data && data[0]) {
       const patched = patchImageUrl(data[0]);
       setNews((prev) => {
-        if (prev.some((n) => n.id === patched.id)) return prev;
+        if (prev.some((n) => String(n.id) === String(patched.id))) return prev;
         return [patched, ...prev].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
       });
+      fetchedAtRef.current.news = Date.now();
       return { data, error: null };
     }
     if (error) {
@@ -538,43 +615,49 @@ export const DataProvider = ({ children }) => {
     }
   };
   const updateNews = async (id, updated) => {
-    setNews((prevNews) => prevNews.map((n) => (n.id === id ? { ...n, ...updated } : n)));
+    setNews((prevNews) => prevNews.map((n) => (String(n.id) === String(id) ? { ...n, ...updated } : n)));
     const { error } = await supabase.from("news").update(updated).eq("id", id);
     if (error) {
       console.error("[DataContext] Error updating news:", error.message);
-      fetchNews(true); // rollback on error
+      fetchNews(true, 0, lastNewsLimitRef.current || 5, lastNewsAdminRef.current); // rollback on error
       return false;
     }
+    fetchedAtRef.current.news = Date.now();
     return true;
   };
   const deleteNews = async (id) => {
-    setNews((prevNews) => prevNews.filter((n) => n.id !== id));
+    setNews((prevNews) => prevNews.filter((n) => String(n.id) !== String(id)));
     const { error } = await supabase.from("news").delete().eq("id", id);
     if (error) {
       console.error("[DataContext] Error deleting news:", error.message);
-      fetchNews(true); // rollback on error
+      fetchNews(true, 0, lastNewsLimitRef.current || 5, lastNewsAdminRef.current); // rollback on error
       return false;
     }
+    fetchedAtRef.current.news = Date.now();
     return true;
   };
   const deleteManyNews = async (ids) => {
-    setNews((prevNews) => prevNews.filter((n) => !ids.includes(n.id)));
+    const idSet = new Set((ids || []).map(String));
+    setNews((prevNews) => prevNews.filter((n) => !idSet.has(String(n.id))));
     const { error } = await supabase.from("news").delete().in("id", ids);
     if (error) {
       console.error("[DataContext] Error deleting multiple news:", error.message);
-      fetchNews(true); // rollback on error
+      fetchNews(true, 0, lastNewsLimitRef.current || 5, lastNewsAdminRef.current); // rollback on error
       return false;
     }
+    fetchedAtRef.current.news = Date.now();
     return true;
   };
   const updateManyNews = async (ids, updated) => {
-    setNews((prevNews) => prevNews.map((n) => (ids.includes(n.id) ? { ...n, ...updated } : n)));
+    const idSet = new Set((ids || []).map(String));
+    setNews((prevNews) => prevNews.map((n) => (idSet.has(String(n.id)) ? { ...n, ...updated } : n)));
     const { error } = await supabase.from("news").update(updated).in("id", ids);
     if (error) {
       console.error("[DataContext] Error updating multiple news:", error.message);
-      fetchNews(true); // rollback on error
+      fetchNews(true, 0, lastNewsLimitRef.current || 5, lastNewsAdminRef.current); // rollback on error
       return false;
     }
+    fetchedAtRef.current.news = Date.now();
     return true;
   };
 
@@ -584,28 +667,35 @@ export const DataProvider = ({ children }) => {
       .from("team")
       .insert([member])
       .select();
-    if (!error && data) {
+    if (!error && data && data[0]) {
       setTeam((prev) => {
-        if (prev.some((t) => t.id === data[0].id)) return prev;
+        if (prev.some((t) => String(t.id) === String(data[0].id))) return prev;
         return [...prev, data[0]].sort((a, b) => Number(a.id) - Number(b.id));
       });
+      fetchedAtRef.current.team = Date.now();
     }
   };
   const updateTeam = async (id, updated) => {
     const { error } = await supabase.from("team").update(updated).eq("id", id);
     if (!error) {
-      setTeam(
-        team
-          .map((t) => (t.id === id ? { ...t, ...updated } : t))
+      setTeam((prev) =>
+        prev
+          .map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t))
           .sort((a, b) => Number(a.id) - Number(b.id)),
       );
+      fetchedAtRef.current.team = Date.now();
+      return true;
     }
+    return false;
   };
   const deleteTeam = async (id) => {
     const { error } = await supabase.from("team").delete().eq("id", id);
     if (!error) {
-      setTeam(team.filter((t) => t.id !== id));
+      setTeam((prev) => prev.filter((t) => String(t.id) !== String(id)));
+      fetchedAtRef.current.team = Date.now();
+      return true;
     }
+    return false;
   };
 
   // MESSAGES ----------------------
@@ -636,8 +726,11 @@ export const DataProvider = ({ children }) => {
   const deleteMessage = async (id) => {
     const { error } = await supabase.from("messages").delete().eq("id", id);
     if (!error) {
-      setMessages(messages.filter((m) => m.id !== id));
+      setMessages((prev) => prev.filter((m) => String(m.id) !== String(id)));
+      fetchedAtRef.current.messages = Date.now();
+      return true;
     }
+    return false;
   };
 
   // LOGS --------------------------
@@ -757,6 +850,9 @@ export const DataProvider = ({ children }) => {
     return new Promise((resolve, reject) => {
       const img = new window.Image();
       img.onload = () => {
+        try {
+          URL.revokeObjectURL(img.src);
+        } catch (_) {}
         const canvas = document.createElement('canvas');
         let { width, height } = img;
         // Scale down if very large
@@ -780,7 +876,12 @@ export const DataProvider = ({ children }) => {
           quality
         );
       };
-      img.onerror = reject;
+      img.onerror = (err) => {
+        try {
+          URL.revokeObjectURL(img.src);
+        } catch (_) {}
+        reject(err);
+      };
       img.src = URL.createObjectURL(file);
     });
   };
@@ -798,9 +899,6 @@ export const DataProvider = ({ children }) => {
     user,
     siteConfig,
     nethinetheraSchools,
-    nethinetheraAgenda,
-    nethinetheraVotes,
-    nethinetheraSeating,
     addNews,
     updateNews,
     deleteNews,
@@ -816,6 +914,7 @@ export const DataProvider = ({ children }) => {
     deleteUpload,
     compressImage,
     fetchData,
+    refreshAllData: () => fetchData(true),
     fetchNews,
     hasMoreNews,
     fetchArticleById,
@@ -826,6 +925,8 @@ export const DataProvider = ({ children }) => {
     deleteMessage,
     addActivityLog,
     fetchMessages,
+    fetchAdminData,
+    isAdminDataLoading,
     setNethinetheraSchools,
     // Aliases
     addMember: addTeamMember,
@@ -834,12 +935,11 @@ export const DataProvider = ({ children }) => {
   }), [
     news, team, webUsers, stats, messages, activityLogs, assets,
     loading, isFetching, user, siteConfig, nethinetheraSchools,
-    nethinetheraAgenda, nethinetheraVotes, nethinetheraSeating,
     addNews, updateNews, deleteNews, deleteManyNews, updateManyNews,
     addTeamMember, updateTeam, deleteTeam, updateAsset, updateSiteConfig,
     uploadImage, listUploads, deleteUpload, compressImage, fetchData, fetchNews, hasMoreNews, fetchArticleById,
     fetchTeam, fetchWebUsers, fetchConfig, addMessage, deleteMessage,
-    addActivityLog, fetchMessages, setNethinetheraSchools
+    addActivityLog, fetchMessages, fetchAdminData, isAdminDataLoading, setNethinetheraSchools
   ]);
 
   return (

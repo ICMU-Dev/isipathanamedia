@@ -41,29 +41,15 @@ const LandingPage = () => {
 
   const defaultOrder = [
     "home",
-    "partnerLogos",
     "livestream",
     "about",
-    "nethinethera",
     "services",
     "news",
     "team",
     "contact",
   ];
 
-  let order = [...defaultOrder];
-
-  if (!order.includes("partnerLogos")) {
-    const homeIndex = order.indexOf("home");
-    if (homeIndex !== -1) {
-      order.splice(homeIndex + 1, 0, "partnerLogos");
-    } else {
-      order.unshift("partnerLogos");
-    }
-  }
-
   const { isWipeComplete } = React.useContext(TransitionContext);
-  console.log(`[LandingPage] Rendered. isWipeComplete=${isWipeComplete}`);
 
   return (
     <>
@@ -75,16 +61,16 @@ const LandingPage = () => {
       />
       
       <main className="overflow-x-hidden min-h-[100dvh] bg-dark">
-        {order.map((sectionType) => {
+        {defaultOrder.map((sectionType) => {
           const SectionComponent = sectionMap[sectionType];
           if (!SectionComponent) return null;
           
-          if (sectionType === 'home' || sectionType === 'partnerLogos') {
+          if (sectionType === 'home') {
             return <SectionComponent key={sectionType} shouldAnimate={isWipeComplete} />;
           }
 
           return (
-            <LazySection key={sectionType}>
+            <LazySection key={sectionType} id={sectionType}>
               <Suspense fallback={<div className="min-h-[100vh] bg-dark flex items-center justify-center">Loading...</div>}>
                 <SectionComponent shouldAnimate={isWipeComplete} />
               </Suspense>

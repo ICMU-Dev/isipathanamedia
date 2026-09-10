@@ -16,12 +16,22 @@ if (!supabaseUrl || !supabaseKey) {
 const customFetch = (url, options = {}) => {
   const headers = new Headers(options?.headers || {});
   
-  const sessionStr = sessionStorage.getItem('icmu_session') || localStorage.getItem('icmu_session');
+  let sessionStr = sessionStorage.getItem('icmu_session') || localStorage.getItem('icmu_session');
+  if (!sessionStr && typeof document !== 'undefined') {
+    const match = document.cookie.match(/(^|;\s*)icmu_session=([^;]*)/);
+    if (match) {
+      try {
+        sessionStr = decodeURIComponent(match[2]);
+      } catch (_) {}
+    }
+  }
+
   if (sessionStr) {
     try {
       const session = JSON.parse(sessionStr);
-      if (session && session.indexNumber) {
-        headers.set('x-user-index', session.indexNumber.toString());
+      const indexNum = session?.indexNumber || session?.index_number;
+      if (indexNum) {
+        headers.set('x-user-index', indexNum.toString());
       }
     } catch (e) {}
   }

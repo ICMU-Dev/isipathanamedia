@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import {
   Save,
   CheckCircle2,
@@ -48,6 +49,7 @@ const CreateArticle = () => {
     setCropModalOpen,
     imageToCrop,
     setImageToCrop,
+    closeCropModal,
     editor,
     handleFileUpload,
     handleCropComplete,
@@ -80,11 +82,21 @@ const CreateArticle = () => {
         (formData.tags && formData.tags.length > 0)
       );
 
+  const { adminPath } = useParams();
+
+  const closeAndExit = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(`/${adminPath || "admin"}/news`);
+    }
+  };
+
   const handleRequestClose = () => {
     if (isHalfWritten) {
       setShowDiscardModal(true);
     } else {
-      navigate(-1);
+      closeAndExit();
     }
   };
 
@@ -116,7 +128,9 @@ const CreateArticle = () => {
                {isEditing ? "Edit Article" : "Write Article"}
              </h3>
              <button
+               type="button"
                onClick={handleRequestClose}
+               aria-label="Close"
                className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                <X size={14} />
              </button>
@@ -352,14 +366,21 @@ const CreateArticle = () => {
                   draft or publish it immediately.
                 </p>
 
-                <label className="flex items-center   gap-4 p-4 border border-theme-base bg-[#050505] rounded-2xl mb-6 cursor-pointer w-full max-w-sm hover:border-white/20 transition-all group active:scale-90 hover:shadow-lg shadow-black/50">
+                <label className={`flex items-center gap-4 p-4 border rounded-2xl mb-6 w-full max-w-sm transition-all shadow-black/50 ${
+                  id
+                    ? "border-white/[0.08] bg-[#080808] opacity-80 cursor-not-allowed"
+                    : "border-theme-base bg-[#050505] cursor-pointer hover:border-white/20 group active:scale-95 hover:shadow-lg"
+                }`}>
                   <input
                     type="checkbox"
                     checked={isAnonymous}
-                    onChange={(e) => setIsAnonymous(e.target.checked)}
+                    disabled={!!id}
+                    onChange={(e) => {
+                      if (!id) setIsAnonymous(e.target.checked);
+                    }}
                     className="sr-only"
                   />
-                  <div className="w-12 h-12 rounded-full shrink-0 border-2 border-white/[0.06]  group-hover:border-theme-accent/ transition-colors relative overflow-hidden bg-[var(--admin-card-bg)]  ">
+                  <div className="w-12 h-12 rounded-full shrink-0 border-2 border-white/[0.06] group-hover:border-theme-accent/ transition-colors relative overflow-hidden bg-[var(--admin-card-bg)]">
                     <AnimatePresence mode="wait">
                       {isAnonymous ? (
                         <motion.img
@@ -370,7 +391,7 @@ const CreateArticle = () => {
                           transition={{ duration: 0.2 }}
                           src="/web-app-manifest-192x192.png"
                           alt="ICMU"
-                          className="w-full h-full object-cover  bg-white"
+                          className="w-full h-full object-cover bg-white"
                         />
                       ) : user?.profile_picture ||
                         user?.profile_image ||
@@ -411,10 +432,12 @@ const CreateArticle = () => {
                     <span className="text-sm font-bold text-white truncate transition-colors group-hover:text-[var(--accent)]">
                       {isAnonymous
                         ? "Isipathana College Media Unit"
-                        : user?.name || user?.username || "You"}
+                        : formData.author || user?.name || user?.username || "You"}
                     </span>
-                    <span className="text-[10px] text-theme-accent/ mt-0.5 opacity-50 group-hover:opacity-100 transition-opacity">
-                      Click to switch identity
+                    <span className="text-[10px] text-theme-accent/ mt-0.5 opacity-60">
+                      {id
+                        ? "Author locked after submission"
+                        : "Click to switch identity"}
                     </span>
                   </div>
                 </label>
@@ -487,10 +510,7 @@ const CreateArticle = () => {
       <ImageCropperModal
         isOpen={cropModalOpen}
         imageSrc={imageToCrop}
-        onClose={() => {
-          setCropModalOpen(false);
-          setImageToCrop(null);
-        }}
+        onClose={closeCropModal}
         onCropComplete={handleCropComplete}
         aspectRatio={16 / 9}
         aspectRatioLabel="16:9 Widescreen Ratio (Article)"
@@ -500,7 +520,7 @@ const CreateArticle = () => {
         isOpen={showDiscardModal}
         onDiscard={() => {
           setShowDiscardModal(false);
-          navigate(-1);
+          closeAndExit();
         }}
         onKeepEditing={() => setShowDiscardModal(false)}
         title="Discard Article?"

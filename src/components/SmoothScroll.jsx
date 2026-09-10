@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import Lenis from "lenis";
 import { gsap } from "gsap";
 import { useDeviceCapability } from "../hooks/useDeviceCapability";
@@ -6,6 +7,13 @@ import { useDeviceCapability } from "../hooks/useDeviceCapability";
 const SmoothScroll = ({ children }) => {
   const lenisRef = useRef(null);
   const { isLowEnd, prefersReducedMotion } = useDeviceCapability();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (lenisRef.current) {
+      lenisRef.current.resize();
+    }
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     // Skip smooth scrolling entirely on low-end devices or reduced-motion preference
@@ -25,6 +33,7 @@ const SmoothScroll = ({ children }) => {
     });
 
     lenisRef.current = lenis;
+    window.lenis = lenis;
 
     // Synchronize Lenis with GSAP Ticker
     function update(time) {
@@ -36,6 +45,9 @@ const SmoothScroll = ({ children }) => {
     return () => {
       gsap.ticker.remove(update);
       lenis.destroy();
+      if (window.lenis === lenis) {
+        window.lenis = null;
+      }
     };
   }, [isLowEnd, prefersReducedMotion]);
 

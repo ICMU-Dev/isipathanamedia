@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { Navigate, Outlet, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
 import { motion } from 'framer-motion';
 import SEO from '../SEO';
 
@@ -26,6 +27,14 @@ const ProtectedRoute = () => {
     const { user, loading } = useAuth();
     const { adminPath } = useParams();
     const location = useLocation();
+    const { fetchAdminData } = useData();
+
+    // Lazily load full admin datasets (all articles, messages, web users) upon accessing protected route
+    React.useEffect(() => {
+        if (user && String(user.indexNumber) === String(adminPath) && fetchAdminData) {
+            fetchAdminData();
+        }
+    }, [user, adminPath, fetchAdminData]);
 
     const [showLoader, setShowLoader] = React.useState(false);
 
@@ -68,7 +77,7 @@ const ProtectedRoute = () => {
     }
 
     // Show login if not authenticated or if URL index doesn't match session
-    if (!user || user.indexNumber !== adminPath) {
+    if (!user || String(user.indexNumber) !== String(adminPath)) {
         // Redirect to the clean index route if they are on a nested route (e.g., /1234/dashboard -> /1234)
         if (location.pathname !== `/${adminPath}`) {
             return <Navigate to={`/${adminPath}`} replace />;

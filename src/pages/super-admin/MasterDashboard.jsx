@@ -1,6 +1,5 @@
-import { Skeleton } from "../../components/ui/skeleton";
-import React, { useState, useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   ScanLine,
@@ -24,7 +23,6 @@ import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import SystemDocumentation from "./SystemDocumentation";
-import DatabaseStatus from "./components/DatabaseStatus";
 import AddUserModal from "./components/AddUserModal";
 import EditUserModal from "./components/EditUserModal";
 import UserTableView from "./components/UserTableView";
@@ -132,8 +130,46 @@ const StatBox = ({ label, value, icon: Icon, color, className = "" }) => (
 const MasterDashboard = () => {
   const { adminPath } = useParams();
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const docSlugs = useMemo(
+    () => [
+      "docs",
+      "project-overview",
+      "roles",
+      "public-site",
+      "admin-panel",
+      "super-admin",
+      "streaming-radio",
+      "folder-guide",
+    ],
+    []
+  );
+
+  const getTabFromHash = (hashStr) => {
+    const clean = hashStr?.replace("#", "");
+    if (!clean) return "overview";
+    if (clean === "docs" || clean.startsWith("docs/")) return "docs";
+    if (docSlugs.includes(clean)) return "docs";
+    if (["users", "overview"].includes(clean)) return clean;
+    return "overview";
+  };
+
+  const [activeTab, setActiveTab] = useState(() => getTabFromHash(location.hash));
+
+  useEffect(() => {
+    const tab = getTabFromHash(location.hash);
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [location.hash, activeTab]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    navigate({ hash: tab }, { replace: true });
+  };
+
   const [viewMode, setViewMode] = useState("card");
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -417,28 +453,21 @@ const MasterDashboard = () => {
               icon={LayoutDashboard}
               label="Overview"
               activeTab={activeTab}
-              onClick={setActiveTab}
+              onClick={handleTabChange}
             />
             <TabButton
               value="users"
               icon={Users}
               label="Users & Access"
               activeTab={activeTab}
-              onClick={setActiveTab}
+              onClick={handleTabChange}
             />
             <TabButton
               value="docs"
               icon={BookOpen}
               label="Documentation"
               activeTab={activeTab}
-              onClick={setActiveTab}
-            />
-            <TabButton
-              value="storage"
-              icon={Database}
-              label="Database & Storage"
-              activeTab={activeTab}
-              onClick={setActiveTab}
+              onClick={handleTabChange}
             />
           </div>
         )}
@@ -592,10 +621,7 @@ const MasterDashboard = () => {
           </div>
         )}
 
-        {/* 3. STORAGE MANAGER - Super Admin Only */}
-        {isSuper && activeTab === "storage" && <DatabaseStatus />}
-
-        {/* 4. SYSTEM DOCUMENTATION - Super Admin Only */}
+        {/* 3. SYSTEM DOCUMENTATION - Super Admin Only */}
         {isSuper && activeTab === "docs" && <SystemDocumentation />}
       </div>
 

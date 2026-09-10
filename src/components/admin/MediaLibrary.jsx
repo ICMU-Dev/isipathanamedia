@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
+import { isAdmin as checkIsAdmin } from "../../utils/roles";
 
 const BUCKET = "news_images";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -114,7 +115,7 @@ const TabButton = ({ tab, active, onClick }) => {
 
 const UploadsTab = ({ onSelect, onClose }) => {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.role === "super_admin" || user?.role === "super-admin" || user?.role === "superadmin";
+  const isAdmin = checkIsAdmin(user?.role);
 
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -777,7 +778,7 @@ const MediaLibrary = ({
   defaultFolder = "articles",
 }) => {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.role === "super_admin" || user?.role === "super-admin" || user?.role === "superadmin";
+  const isAdmin = checkIsAdmin(user?.role);
 
   const [activeTab, setActiveTab] = useState("uploads");
   const overlayRef = useRef(null);
@@ -812,7 +813,7 @@ const MediaLibrary = ({
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
-      className="fixed inset-0 z-[120] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[230] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
     >
       {/* Modal container */}
       <div className="w-full h-[95dvh] sm:h-auto sm:max-h-[88vh] sm:max-w-4xl bg-[var(--admin-card-bg,#121212)] rounded-2xl border border-[var(--admin-border)] flex flex-col overflow-hidden shadow-2xl">

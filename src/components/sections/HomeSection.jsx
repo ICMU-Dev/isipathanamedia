@@ -112,7 +112,7 @@ const HomeSection = ({ shouldAnimate }) => {
           loop
           muted
           playsInline
-          preload="metadata"
+          preload="none"
           className="object-cover w-full h-full pointer-events-none"
           disablePictureInPicture
           controlsList="nodownload nofullscreen noremoteplayback">
@@ -128,6 +128,11 @@ const HomeSection = ({ shouldAnimate }) => {
           <img
             src={mainLogo}
             alt="Logos"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            width={120}
+            height={120}
             className="w-[100px] md:w-[120px] object-contain opacity-90"
           />
         </div>

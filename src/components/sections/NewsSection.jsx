@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronRight, Newspaper, Calendar } from "lucide-react";
 import ImageWithLoader from "../ui/ImageWithLoader";
@@ -20,10 +20,14 @@ const NewsSection = () => {
   const sectionRef = useRef(null);
 
   // Show the three most recent public articles or updates together.
-  const recentNews = news
-    ?.filter((n) => n.status === "published" && n.visibility === "public")
-    ?.sort((a, b) => new Date(b.date) - new Date(a.date))
-    ?.slice(0, 3) || [];
+  const recentNews = useMemo(() => {
+    return (
+      news
+        ?.filter((n) => n.status === "published" && n.visibility === "public")
+        ?.sort((a, b) => new Date(b.date) - new Date(a.date))
+        ?.slice(0, 3) || []
+    );
+  }, [news]);
 
   useEffect(() => {
     if (!isLoadingNews && recentNews.length > 0) {
@@ -103,9 +107,9 @@ const NewsSection = () => {
           <div className="news-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {recentNews.map((item) => (
               <Link 
-                to={`/news/${item.id}`} 
+                to={item.type === "update" ? `/news#update-${item.id}` : `/news/${item.id}`} 
                 key={item.id}
-                className="news-card group relative rounded-2xl bg-[#09090b] border border-white/[0.06]  overflow-hidden hover:border-white/[0.2] transition-colors duration-500 flex flex-col h-full"
+                className="news-card group relative rounded-3xl bg-[#09090b] border border-white/[0.06]  overflow-hidden hover:border-white/[0.2] transition-colors duration-500 flex flex-col h-full"
               >
                 {/* Image Container */}
                   <div className="relative aspect-video overflow-hidden bg-black">

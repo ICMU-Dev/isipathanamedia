@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 
-const SITE_URL = 'https://isipathanamedia.online';
+const SITE_URL = import.meta.env.VITE_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 const DEFAULT_TITLE = 'Isipathana College Media Unit';
 const DEFAULT_DESCRIPTION = 'Official website of Isipathana College Media Unit (ICMU). Discover Nethinethera – the media day, MPMU Most Popular Media Unit, Sandhwani, and 25+ years of cinematic storytelling at Isipathana College, Colombo.';
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`;

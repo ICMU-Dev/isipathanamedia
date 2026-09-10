@@ -16,6 +16,7 @@ import {
   resolveAuthorInfo,
 } from "./NewsUtils";
 import iconLogo from "../../assets/image.png";
+import { UserAvatar } from "../ui/avatar";
 
 const NewsBoardView = ({
   filteredData,
@@ -117,25 +118,23 @@ const NewsBoardView = ({
                     {/* Footer: Author + Actions */}
                     <div className="mt-auto pt-2 border-t border-white/[0.05] flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                          {isICMU ? (
+                        {isICMU ? (
+                          <div className="w-5 h-5 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
                             <img
                               src={iconLogo}
                               alt="ICMU"
                               className="w-full h-full object-cover opacity-95"
                             />
-                          ) : avatarUrl ? (
-                            <img
-                              src={avatarUrl}
-                              alt={authorName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-[8px] font-bold text-white/80">
-                              {initials}
-                            </span>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <UserAvatar
+                            src={avatarUrl}
+                            name={authorName}
+                            size="xs"
+                            className="w-5 h-5 border border-white/10 shrink-0"
+                            fallbackClassName="text-[8px] font-bold text-white/80"
+                          />
+                        )}
                         <div className="flex flex-col min-w-0">
                           <span className="text-[10px] font-semibold text-white/90 truncate flex items-center gap-1 leading-tight">
                             {authorName}

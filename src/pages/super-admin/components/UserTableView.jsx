@@ -11,6 +11,8 @@ import { AnimatedBadge } from "../../../components/motion/animated-badge";
 import ClearanceModal from "./ClearanceModal";
 import UserActionsModal from "./UserActionsModal";
 import { getRoleLabel, isSuperAdmin } from "../../../utils/roles";
+import { UserAvatar } from "../../../components/ui/avatar";
+import { cn } from "../../../lib/utils";
 
 const formatLastSeen = (timestamp) => {
   if (!timestamp) return "Never";
@@ -97,36 +99,26 @@ const UserTableView = ({
                       className="hover:bg-white/[0.02] transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className="relative w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center font-bold text-lg text-zinc-100 overflow-hidden shrink-0 shadow-inner">
-                            <span className="absolute flex items-center justify-center w-full h-full">
-                              {u.full_name?.charAt(0)}
-                            </span>
-                            {u.avatar_url && (
-                              <img
-                                src={u.avatar_url}
-                                alt={u.full_name}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-full h-full object-cover absolute inset-0 z-10"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = "none";
-                                }}
-                              />
+                          <UserAvatar
+                            user={u}
+                            size="lg"
+                            shape="rounded"
+                            showBadge
+                            badgeClassName={cn(
+                              "w-3.5 h-3.5 border-2 border-black -bottom-1 -right-1",
+                              u.is_active !== false
+                                ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.85)] animate-pulse"
+                                : "bg-red-500"
                             )}
-                            <div
-                              className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-black z-20 ${
-                                u.is_active !== false
-                                  ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.85)] animate-pulse"
-                                  : "bg-red-500"
-                              }`}
-                            />
-                          </div>
+                            className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 shadow-inner"
+                            fallbackClassName="text-lg font-bold text-zinc-100"
+                          />
                           <div>
                             <div className="font-bold text-white text-base tracking-tight flex items-center gap-2">
                               {u.full_name}
                               {u.is_active === false && (
                                 <AnimatedBadge
-                                  status="error"
+                                  status="danger"
                                   size="sm"
                                   className="text-[9px] uppercase tracking-wider font-bold">
                                   Suspended

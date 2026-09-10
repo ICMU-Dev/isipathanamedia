@@ -1,7 +1,16 @@
 export default async (request) => {
-  const ALLOWED_ORIGIN = 'https://isipathanamedia.online';
+  const requestUrl = new URL(request.url);
+  const configuredOrigin = Deno.env.get('URL') || Deno.env.get('ALLOWED_ORIGIN') || '';
+  const origin = request.headers.get('origin');
+  const isAllowed = !origin ||
+    origin === configuredOrigin ||
+    origin === requestUrl.origin ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:') ||
+    origin.endsWith('.netlify.app');
+
   const corsHeaders = {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Access-Control-Allow-Origin': isAllowed && origin ? origin : (configuredOrigin || '*'),
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Cache-Control': 'public, max-age=86400' // Cache proxied images for 24h
@@ -11,8 +20,7 @@ export default async (request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const origin = request.headers.get('origin');
-  if (origin && origin !== ALLOWED_ORIGIN && !origin.startsWith('http://localhost:')) {
+  if (origin && !isAllowed) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
   }
 

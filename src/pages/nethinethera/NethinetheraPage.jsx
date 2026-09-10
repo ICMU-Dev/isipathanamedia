@@ -18,6 +18,8 @@ import {
 const SAGE = "#7aab6e";
 const SAGE_DIM = "rgba(122,171,110,";
 
+const SITE_URL = import.meta.env.VITE_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+
 const nethinetheraJsonLd = {
   "@context": "https://schema.org",
   "@type": "Event",
@@ -27,8 +29,8 @@ const nethinetheraJsonLd = {
   "endDate": "2026-05-15T18:00:00+05:30",
   "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
   "eventStatus": "https://schema.org/EventScheduled",
-  "url": "https://isipathanamedia.online/nethinethera",
-  "image": "https://isipathanamedia.online/og-image.png",
+  "url": `${SITE_URL}/nethinethera`,
+  "image": `${SITE_URL}/og-image.png`,
   "location": {
     "@type": "Place",
     "name": "Isipathana College",
@@ -44,7 +46,7 @@ const nethinetheraJsonLd = {
   "organizer": {
     "@type": "Organization",
     "name": "Isipathana College Media Unit",
-    "url": "https://isipathanamedia.online"
+    "url": SITE_URL
   },
   "performer": {
     "@type": "Organization",

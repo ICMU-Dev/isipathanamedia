@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {  AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import {
@@ -28,12 +28,9 @@ const formatMessageDate = (timestamp) => {
   const diffInSeconds = Math.floor((now - date) / 1000);
 
   if (diffInSeconds < 60) return "Just now";
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours}h ago`;
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 7) return `${diffInDays}d ago`;
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
 
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -45,7 +42,7 @@ const formatMessageDate = (timestamp) => {
 const formatExactDateTime = (timestamp) => {
   if (!timestamp) return "";
   const date = new Date(timestamp);
-  if (isNaN(date.getTime())) return timestamp;
+  if (isNaN(date.getTime())) return "";
   return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -58,10 +55,16 @@ const formatExactDateTime = (timestamp) => {
 const AdminMessages = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super-admin" || user?.role === "superadmin" || user?.role === "super_admin";
-  const { messages, deleteMessage, addActivityLog } = useData();
+  const { messages, deleteMessage, addActivityLog, fetchMessages } = useData();
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyContent, setReplyContent] = useState("");
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (fetchMessages) {
+      fetchMessages();
+    }
+  }, [fetchMessages]);
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this message?")) {

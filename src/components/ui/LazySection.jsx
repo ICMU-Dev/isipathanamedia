@@ -1,14 +1,23 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useInView } from "framer-motion";
 
-const LazySection = ({ children, minHeight = "100vh" }) => {
+const LazySection = ({ children, id, minHeight = "100vh" }) => {
   const ref = useRef(null);
-  // Trigger once it comes within 200px of the viewport to allow time to load
-  const isInView = useInView(ref, { once: true, margin: "200px 0px" });
+  const location = useLocation();
+  const isHashTarget = location.hash === `#${id}`;
+  const isInView = useInView(ref, { once: true, margin: "300px 0px" });
+  const shouldRender = isHashTarget || isInView;
+
+  useEffect(() => {
+    if (isHashTarget && window.lenis) {
+      window.lenis.resize();
+    }
+  }, [isHashTarget]);
 
   return (
-    <div ref={ref} style={{ minHeight: isInView ? "auto" : minHeight }}>
-      {isInView ? children : null}
+    <div id={id} ref={ref} style={{ minHeight: shouldRender ? "auto" : minHeight }}>
+      {shouldRender ? children : null}
     </div>
   );
 };

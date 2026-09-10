@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   MessageSquarePlus,
@@ -19,6 +20,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
 import { isAdmin, isWriter, isBroadcaster } from "../../utils/roles";
+import { UserAvatar } from "../ui/avatar";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -247,6 +249,16 @@ const FeedbackWidget = () => {
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, closeModal]);
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.type || !form.title.trim() || !form.description.trim()) {
@@ -318,40 +330,42 @@ const FeedbackWidget = () => {
         onClick={openModal}
         title="Send Feedback (Ctrl+Shift+F)"
         aria-label="Open feedback form"
-        className="fixed bottom-[100px] md:bottom-6 right-6 md:right-6 z-[45] w-9 h-9 rounded-full bg-[#181818] border border-white/[0.12] text-white/40 hover:text-white hover:bg-[#222] transition-colors duration-150 flex items-center justify-center shadow-lg"
+        className="fixed bottom-[100px] md:bottom-6 right-6 md:right-6 z-[55] w-9 h-9 rounded-full bg-[#181818] border border-white/[0.12] text-white/40 hover:text-white hover:bg-[#222] transition-colors duration-150 flex items-center justify-center shadow-lg"
         whileTap={{ scale: 0.92 }}>
         <MessageSquarePlus size={16} />
       </motion.button>
 
       {/* ── Modal ── */}
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              key="feedback-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-[60] bg-black/80"
-              onClick={closeModal}
-            />
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {isOpen && (
+              <>
+                {/* Backdrop */}
+                <motion.div
+                  key="feedback-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="fixed inset-0 z-[179] bg-black/80 backdrop-blur-sm"
+                  onClick={closeModal}
+                />
 
-            {/* Modal Card */}
-            <motion.div
-              key="feedback-modal"
-              initial={{ opacity: 0, scale: 0.97, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 8 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-              className="fixed inset-0 z-[61] flex items-center justify-center px-4 pointer-events-none will-change-transform">
-              <div
-                className="pointer-events-auto w-full max-w-md bg-[var(--admin-card-bg)]   borderborder-white/[0.06]  rounded-2xl shadow-2xl overflow-hidden"
-                onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-                  <div className="flex items-center gap-3">
+                {/* Modal Card */}
+                <motion.div
+                  key="feedback-modal"
+                  initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97, y: 8 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="fixed inset-0 z-[180] flex items-center justify-center p-3 sm:p-4 pointer-events-none will-change-transform overflow-y-auto">
+                  <div
+                    className="pointer-events-auto w-full max-w-md max-h-[min(650px,calc(100dvh-40px))] flex flex-col border bg-admin-card border-white/[0.06] rounded-2xl shadow-2xl overflow-hidden my-auto"
+                    onClick={(e) => e.stopPropagation()}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] shrink-0">
+                      <div className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-2xl bg-theme-accent/5 flex items-center justify-center">
                       <MessageSquarePlus
                         size={14}
@@ -416,24 +430,16 @@ const FeedbackWidget = () => {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       onSubmit={handleSubmit}
-                      className="p-5 space-y-4">
+                      className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                       {/* Reporter Info (read-only strip) */}
                       <div className="flex items-center gap-3 px-3 py-2 bg-white/[0.02] border border-white/[0.06]  rounded-2xl">
                         {/* Avatar */}
-                        <div className="w-7 h-7 rounded-full bg-white/[0.08] border border-white/5 flex items-center justify-center text-[11px] font-semibold text-white/60 shrink-0 overflow-hidden">
-                          {user?.avatarUrl ? (
-                            <img
-                              src={user.avatarUrl}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            (user?.name?.charAt(0) || "A").toUpperCase()
-                          )}
-                        </div>
+                        <UserAvatar
+                          user={user}
+                          size="sm"
+                          className="w-7 h-7 bg-white/[0.08] border border-white/5 shrink-0"
+                          fallbackClassName="text-[11px] font-semibold text-white/60"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="text-[12px] font-medium text-white/70 truncate">
                             {user?.name || "Anonymous"}
@@ -615,7 +621,9 @@ const FeedbackWidget = () => {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
     </>
   );
 };

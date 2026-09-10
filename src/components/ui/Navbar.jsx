@@ -71,18 +71,40 @@ const Navbar = ({ shouldAnimate }) => {
   const lastScrollY = useRef(0);
   const scrollTicking = useRef(false);
 
+  const scrollToTarget = useCallback((targetId) => {
+    if (!targetId) return false;
+    const cleanId = targetId.replace(/^#/, "");
+    const element = document.getElementById(cleanId);
+    if (element) {
+      if (window.lenis) {
+        window.lenis.resize();
+        window.lenis.scrollTo(element, { offset: -60, duration: 1.2 });
+      } else {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+      return true;
+    }
+    return false;
+  }, []);
+
   // Handle hash scrolling if navigating back to home with an anchor
   useEffect(() => {
     if (isHomePage && location.hash) {
       const id = location.hash.replace("#", "");
-      setTimeout(() => {
-        const element = document.getElementById(id);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100); // Wait for render
+
+      // Multi-stage scroll to guarantee alignment as lazy sections render and layout stabilizes
+      const delays = [50, 150, 350, 650, 1000];
+      const timeouts = delays.map((delay) =>
+        setTimeout(() => {
+          scrollToTarget(id);
+        }, delay)
+      );
+
+      return () => {
+        timeouts.forEach(clearTimeout);
+      };
     }
-  }, [location, isHomePage]);
+  }, [location.hash, isHomePage, scrollToTarget]);
 
   // Entrance animation
   useEffect(() => {
@@ -179,10 +201,8 @@ const Navbar = ({ shouldAnimate }) => {
       if (isMenuOpen) toggleMenu();
     } else {
       if (isHomePage) {
-        const element = document.getElementById(item.link);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth" });
-        }
+        scrollToTarget(item.link);
+        window.history.replaceState(null, "", `#${item.link}`);
         if (isMenuOpen) toggleMenu();
       } else {
         navigate(`/#${item.link}`);

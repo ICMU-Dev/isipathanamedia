@@ -180,6 +180,18 @@ async function trackDeviceSession(userId) {
     }
 }
 
+// Helper to determine if current route is part of admin/protected panels
+const isAdminPath = () => {
+    if (typeof window === "undefined") return false;
+    const path = window.location.pathname;
+    return (
+        path.startsWith("/admin") ||
+        path.startsWith("/master-dashboard") ||
+        path.startsWith("/broadcaster") ||
+        /^\/\d+/.test(path)
+    );
+};
+
 // ─── Context ──────────────────────────────────────────────────
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -196,6 +208,9 @@ export const AuthProvider = ({ children }) => {
                 // Instantly set what we have to prevent UI jumps
                 setUser(session);
                 saveSession(session, session.rememberMe);
+
+                // Only perform live DB sync when visiting admin/protected panels
+                if (!isAdminPath()) return;
 
                 // Fetch latest live user record directly from Supabase DB
                 try {
@@ -246,6 +261,7 @@ export const AuthProvider = ({ children }) => {
                             return;
                         }
 
+                        const liveAvatar = dbUser.avatar_url || dbUser.profile || dbUser.profile_picture || session.avatarUrl || session.avatar_url || null;
                         const liveSession = {
                             ...session,
                             id: dbUser.id || session.id,
@@ -253,7 +269,8 @@ export const AuthProvider = ({ children }) => {
                             role: dbUser.role || session.role,
                             indexNumber: dbUser.index_number || session.indexNumber,
                             email: dbUser.email || session.email || null,
-                            avatarUrl: dbUser.avatar_url || session.avatarUrl || null,
+                            avatarUrl: liveAvatar,
+                            avatar_url: liveAvatar,
                             userSettings: dbUser.user_settings || {},
                         };
                         setUser(liveSession);
@@ -290,9 +307,10 @@ export const AuthProvider = ({ children }) => {
 
     // ─── Realtime & Periodic suspension heartbeat ─────────────────
     // Listens for instant suspension via Supabase Realtime and falls back 
-    // to a 30-second polling interval in case the websocket disconnects.
+    // to a 120-second polling interval in case the websocket disconnects.
+    // Restricted strictly to admin routes to prevent public page overhead.
     useEffect(() => {
-        if (!user?.id) return;
+        if (!user?.id || !isAdminPath()) return;
 
         const checkSuspension = async () => {
             try {
@@ -388,6 +406,7 @@ export const AuthProvider = ({ children }) => {
                 indexNumber: data.index_number,
                 email:       data.email ?? null,
                 avatarUrl:   data.avatar_url ?? data.profile ?? data.profile_picture ?? null,
+                avatar_url:  data.avatar_url ?? data.profile ?? data.profile_picture ?? null,
                 profile:     data.profile ?? null,
                 profile_picture: data.profile_picture ?? null,
                 rememberMe:  rememberMe,
@@ -482,13 +501,15 @@ export const AuthProvider = ({ children }) => {
             }
 
             // Log them in using our custom session structure
+            const liveAvatar = dbUser.avatar_url ?? googlePicture ?? dbUser.profile ?? dbUser.profile_picture ?? null;
             const profile = {
                 id:          dbUser.id,
                 name:        dbUser.full_name || "Admin User",
                 role:        dbUser.role || "admin",
                 indexNumber: dbUser.index_number,
                 email:       dbUser.email,
-                avatarUrl:   dbUser.avatar_url ?? dbUser.profile ?? dbUser.profile_picture ?? null,
+                avatarUrl:   liveAvatar,
+                avatar_url:  liveAvatar,
                 profile:     dbUser.profile ?? null,
                 profile_picture: dbUser.profile_picture ?? null,
                 rememberMe:  rememberMe,
@@ -530,16 +551,18 @@ export const AuthProvider = ({ children }) => {
             if (error) throw error;
             if (!success) throw new Error("Failed to link account. User profile not found in database.");
 
+            const liveAvatar = googlePicture || user.avatarUrl || user.avatar_url || null;
             const updatedProfile = {
                 ...user,
                 email: googleEmail,
-                avatarUrl: googlePicture
+                avatarUrl: liveAvatar,
+                avatar_url: liveAvatar,
             };
 
             saveSession(updatedProfile, user.rememberMe);
             setUser(updatedProfile);
 
-            return { success: true, email: googleEmail, avatarUrl: googlePicture };
+            return { success: true, email: googleEmail, avatarUrl: liveAvatar };
         } catch (err) {
             console.error('[Auth] bindGoogleIdentity failed:', err);
             return { success: false, message: err.message || 'Failed to bind Google identity.' };
@@ -555,16 +578,24 @@ export const AuthProvider = ({ children }) => {
             const fileName = `${user.id}-${Math.random()}.${fileExt}`;
             const filePath = `avatars/${fileName}`;
 
-            // Upload to Supabase Storage (assuming 'profiles' bucket exists)
-            const { error: uploadError } = await supabase.storage
-                .from('profiles')
+            // Upload to Supabase Storage with graceful bucket fallback
+            let bucketName = 'profiles';
+            let uploadRes = await supabase.storage
+                .from(bucketName)
                 .upload(filePath, file, { upsert: true });
 
-            if (uploadError) throw uploadError;
+            if (uploadRes.error && uploadRes.error.message?.toLowerCase().includes('bucket not found')) {
+                bucketName = 'assets';
+                uploadRes = await supabase.storage
+                    .from(bucketName)
+                    .upload(filePath, file, { upsert: true });
+            }
+
+            if (uploadRes.error) throw uploadRes.error;
 
             // Get public URL
             const { data: { publicUrl } } = supabase.storage
-                .from('profiles')
+                .from(bucketName)
                 .getPublicUrl(filePath);
 
             // Update database via RPC to bypass RLS
@@ -576,7 +607,7 @@ export const AuthProvider = ({ children }) => {
             if (updateError) throw updateError;
             if (!success) throw new Error("User record not found to update.");
 
-            const updatedProfile = { ...user, avatarUrl: publicUrl };
+            const updatedProfile = { ...user, avatarUrl: publicUrl, avatar_url: publicUrl };
             saveSession(updatedProfile, user.rememberMe);
             setUser(updatedProfile);
 
@@ -591,18 +622,20 @@ export const AuthProvider = ({ children }) => {
 
     // ─── Delete Custom Avatar ───────────────────────────────────
     const deleteCustomAvatar = useCallback(async () => {
-        if (!user || !user.id || !user.avatarUrl) return { success: false, message: "No avatar to delete." };
+        const currentAvatar = user?.avatarUrl || user?.avatar_url;
+        if (!user || !user.id || !currentAvatar) return { success: false, message: "No avatar to delete." };
         
         setLoading(true);
         try {
             // Extract file path from public URL if it's a Supabase storage file
-            if (user.avatarUrl.includes('/profiles/')) {
-                const urlParts = user.avatarUrl.split('/profiles/');
+            const bucketName = currentAvatar.includes('/profiles/') ? 'profiles' : currentAvatar.includes('/assets/') ? 'assets' : null;
+            if (bucketName) {
+                const urlParts = currentAvatar.split(`/${bucketName}/`);
                 if (urlParts.length > 1) {
                     const filePath = urlParts[1];
                     // Delete from Supabase Storage
                     const { error: storageError } = await supabase.storage
-                        .from('profiles')
+                        .from(bucketName)
                         .remove([filePath]);
                     if (storageError) console.warn('[Auth] Failed to delete file from storage:', storageError);
                 }
@@ -617,7 +650,7 @@ export const AuthProvider = ({ children }) => {
             if (updateError) throw updateError;
             if (!success) throw new Error("User record not found to update.");
 
-            const updatedProfile = { ...user, avatarUrl: null };
+            const updatedProfile = { ...user, avatarUrl: null, avatar_url: null };
             saveSession(updatedProfile, user.rememberMe);
             setUser(updatedProfile);
 
@@ -645,7 +678,7 @@ export const AuthProvider = ({ children }) => {
             if (updateError) throw updateError;
             if (!success) throw new Error("User record not found to update.");
 
-            const updatedProfile = { ...user, avatarUrl: googleUrl };
+            const updatedProfile = { ...user, avatarUrl: googleUrl, avatar_url: googleUrl };
             saveSession(updatedProfile, user.rememberMe);
             setUser(updatedProfile);
 

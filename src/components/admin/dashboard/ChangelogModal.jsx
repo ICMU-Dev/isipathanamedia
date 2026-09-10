@@ -1,10 +1,26 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Zap, Sparkles, Clock } from "lucide-react";
 
 const ChangelogModal = ({ isOpen, onClose, log, data }) => {
   // Support both 'log' and 'data' props for flexibility
   const currentData = log || data;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
 
   // ESC key listener to close modal
   useEffect(() => {
@@ -24,22 +40,29 @@ const ChangelogModal = ({ isOpen, onClose, log, data }) => {
   const steps = currentData?.steps || [];
   const isMajor = currentData?.isMajor ?? true;
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.12, ease: "easeOut" }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md"
-          onClick={onClose}>
+        <div className="fixed inset-0 z-[210] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          {/* Backdrop covering full screen including sidebar */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md cursor-pointer"
+            onClick={onClose}
+          />
+
+          {/* Modal Container */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 8 }}
-            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="bg-[#0c0c0e]/20 backdrop-blur-sm border border-white/5 rounded-2xl sm:rounded-2xl p-4 sm:p-5 w-[90vw] max-w-md relative shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95)] max-h-[70vh] sm:max-h-[78vh] flex flex-col overflow-hidden"
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            className="bg-[var(--admin-card-bg,#0e0e11)] border border-[var(--admin-border,rgba(255,255,255,0.08))] rounded-3xl p-4 sm:p-6 w-[92vw] max-w-lg relative shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95)] max-h-[85vh] sm:max-h-[88vh] flex flex-col overflow-hidden z-10 my-auto"
             onClick={(e) => e.stopPropagation()}>
             {/* Close Button */}
             <button
@@ -134,9 +157,10 @@ const ChangelogModal = ({ isOpen, onClose, log, data }) => {
               </button>
             </div>
           </motion.div>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

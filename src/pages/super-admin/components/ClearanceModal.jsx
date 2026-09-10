@@ -8,6 +8,7 @@ import {
   isSuperAdmin,
 } from "../../../utils/roles";
 import { toast } from "sonner";
+import { UserAvatar } from "../../../components/ui/avatar";
 
 export default function ClearanceModal({ user, onClose, onSave }) {
   const [selectedRole, setSelectedRole] = useState(user?.role || "");
@@ -52,17 +53,13 @@ export default function ClearanceModal({ user, onClose, onSave }) {
       {/* Header */}
       <div className="p-5 sm:p-6 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center font-bold text-white relative overflow-hidden shrink-0 shadow-md">
-            {user.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt={user.full_name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span>{user.full_name?.charAt(0)}</span>
-            )}
-          </div>
+          <UserAvatar
+            user={user}
+            size="lg"
+            shape="rounded"
+            className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 shrink-0 shadow-md"
+            fallbackClassName="font-bold text-white"
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-white tracking-tight truncate">

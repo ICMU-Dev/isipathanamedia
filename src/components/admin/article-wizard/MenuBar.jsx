@@ -31,6 +31,89 @@ const MenuBar = ({ editor, onInsertImage }) => {
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   };
 
+  const runSmartFormat = (formatCallback) => {
+    if (!editor) return;
+    const { state } = editor;
+    const { from, to, empty } = state.selection;
+
+    if (empty) {
+      formatCallback(editor.chain().focus()).run();
+      return;
+    }
+
+    const $from = state.doc.resolve(from);
+    const $to = state.doc.resolve(to);
+    const hasTextBefore = $from.parentOffset > 0;
+    const hasTextAfter = $to.parentOffset < $to.parent.content.size;
+
+    let hasHardBreaks = false;
+    state.doc.nodesBetween(from, to, (node) => {
+      if (node.type.name === "hardBreak") {
+        hasHardBreaks = true;
+        return false;
+      }
+    });
+
+    if (!hasTextBefore && !hasTextAfter && !hasHardBreaks) {
+      formatCallback(editor.chain().focus()).run();
+      return;
+    }
+
+    // Isolate selected text into its own block
+    const chain = editor.chain().focus().command(({ tr, state, dispatch }) => {
+      if (!dispatch) return true;
+
+      // 1. Replace hardBreaks inside selection with paragraph splits
+      if (hasHardBreaks) {
+        const breakPositions = [];
+        tr.doc.nodesBetween(from, to, (node, pos) => {
+          if (node.type.name === "hardBreak") {
+            breakPositions.push(pos);
+          }
+        });
+        for (let i = breakPositions.length - 1; i >= 0; i--) {
+          const bp = breakPositions[i];
+          const mappedBp = tr.mapping.map(bp);
+          tr.delete(mappedBp, mappedBp + 1);
+          try {
+            tr.split(mappedBp);
+          } catch {}
+        }
+      }
+
+      // 2. Split boundaries if selection only covers partial line/paragraph
+      const curFrom = tr.mapping.map(from, 1);
+      const curTo = tr.mapping.map(to, -1);
+
+      try {
+        const resTo = tr.doc.resolve(curTo);
+        if (resTo.parentOffset < resTo.parent.content.size && resTo.depth > 0) {
+          tr.split(curTo);
+        }
+      } catch {}
+
+      try {
+        const resFrom = tr.doc.resolve(curFrom);
+        if (resFrom.parentOffset > 0 && resFrom.depth > 0) {
+          tr.split(resFrom);
+        }
+      } catch {}
+
+      const finalFrom = tr.mapping.map(curFrom, 1);
+      const finalTo = tr.mapping.map(curTo, -1);
+
+      const TextSelection = state.selection.constructor;
+      if (finalFrom < finalTo) {
+        try {
+          tr.setSelection(TextSelection.create(tr.doc, finalFrom, finalTo));
+        } catch {}
+      }
+      return true;
+    });
+
+    formatCallback(chain).run();
+  };
+
   const Btn = ({ onClick, isActive, disabled, icon: Icon, title }) => (
     <button
       type="button"
@@ -45,7 +128,7 @@ const MenuBar = ({ editor, onInsertImage }) => {
   );
 
   return (
-    <div className="flex rounded-2xl  flex-wrap items-center gap-0.5 sm:gap-1 p-1.5 sm:p-2 border-b border-theme-base sticky top-0 z-10 bg-transparent">
+    <div className="flex rounded-2xl flex-wrap items-center gap-0.5 sm:gap-1 p-1.5 sm:p-2 border-b border-theme-base sticky top-0 z-10 bg-transparent">
       <Btn
         onClick={() => editor?.chain().focus().toggleBold().run()}
         isActive={editor?.isActive("bold")}
@@ -67,7 +150,7 @@ const MenuBar = ({ editor, onInsertImage }) => {
       <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
       <Btn
         onClick={() =>
-          editor?.chain().focus().toggleHeading({ level: 1 }).run()
+          runSmartFormat((chain) => chain.toggleHeading({ level: 1 }))
         }
         isActive={editor?.isActive("heading", { level: 1 })}
         icon={Heading1}
@@ -75,7 +158,7 @@ const MenuBar = ({ editor, onInsertImage }) => {
       />
       <Btn
         onClick={() =>
-          editor?.chain().focus().toggleHeading({ level: 2 }).run()
+          runSmartFormat((chain) => chain.toggleHeading({ level: 2 }))
         }
         isActive={editor?.isActive("heading", { level: 2 })}
         icon={Heading2}
@@ -83,7 +166,7 @@ const MenuBar = ({ editor, onInsertImage }) => {
       />
       <Btn
         onClick={() =>
-          editor?.chain().focus().toggleHeading({ level: 3 }).run()
+          runSmartFormat((chain) => chain.toggleHeading({ level: 3 }))
         }
         isActive={editor?.isActive("heading", { level: 3 })}
         icon={Heading3}
@@ -91,26 +174,26 @@ const MenuBar = ({ editor, onInsertImage }) => {
       />
       <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
       <Btn
-        onClick={() => editor?.chain().focus().toggleBulletList().run()}
+        onClick={() => runSmartFormat((chain) => chain.toggleBulletList())}
         isActive={editor?.isActive("bulletList")}
         icon={List}
         title="Bullets"
       />
       <Btn
-        onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+        onClick={() => runSmartFormat((chain) => chain.toggleOrderedList())}
         isActive={editor?.isActive("orderedList")}
         icon={ListOrdered}
         title="Numbers"
       />
       <Btn
-        onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+        onClick={() => runSmartFormat((chain) => chain.toggleBlockquote())}
         isActive={editor?.isActive("blockquote")}
         icon={Quote}
         title="Quote"
       />
       <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
       <Btn
-        onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
+        onClick={() => runSmartFormat((chain) => chain.toggleCodeBlock())}
         isActive={editor?.isActive("codeBlock")}
         icon={Code}
         title="Code"

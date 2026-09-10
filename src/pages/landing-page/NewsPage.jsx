@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { isAdmin as checkIsAdmin, isWriter as checkIsWriter } from "../../utils/roles";
@@ -26,7 +26,7 @@ import { motion } from "framer-motion";
 import ImageWithLoader from "../../components/ui/ImageWithLoader";
 import { getPublicAuthorName, isInstitutionAuthor } from "../../utils/authorUtils";
 
-const SITE_URL = "https://isipathanamedia.online";
+const SITE_URL = import.meta.env.VITE_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
 // ─── Pure Helper Functions ──────────────────────────────────────────
 const getReadingTime = (content) => {
@@ -104,7 +104,7 @@ const UpdateModal = ({ update, onClose }) => {
   const authorName = "isipathanamedia";
 
   const handleShare = async () => {
-    const url = `${SITE_URL}/news/${update.id}`;
+    const url = `${SITE_URL}/news#update-${update.id}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: update.title || "ICMU Update", url });
@@ -530,9 +530,10 @@ const ArticleCard = React.memo(({ item, featured, compact, sidebar, onNavigate }
 
 // ─── Main NewsPage Component ────────────────────────────────────────
 const NewsPage = () => {
-  const { news, fetchNews, webUsers, fetchWebUsers, isFetching, loading, hasMoreNews } = useData();
+  const { news, fetchNews, fetchArticleById, isFetching, loading, hasMoreNews } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const userRole = user?.role;
   const isAdmin = checkIsAdmin(userRole);
@@ -550,7 +551,7 @@ const NewsPage = () => {
 
   const scrollCarousel = (direction) => {
     if (carouselRef.current) {
-      const scrollAmount = 300;
+      const scrollAmount = Math.max(carouselRef.current.clientWidth * 0.75, 320);
       carouselRef.current.scrollBy({
         left: direction === "left" ? -scrollAmount : scrollAmount,
         behavior: "smooth",
@@ -559,8 +560,8 @@ const NewsPage = () => {
   };
 
   useEffect(() => {
-    Promise.all([fetchNews(), fetchWebUsers()]);
-  }, [fetchNews, fetchWebUsers]);
+    fetchNews(false, 0, 30);
+  }, [fetchNews]);
 
   useEffect(() => {
     const legacyId = searchParams.get("id");
@@ -576,6 +577,26 @@ const NewsPage = () => {
     if (tagParam) setActiveTag(tagParam);
     if (authorParam) setActiveAuthor(authorParam);
   }, [searchParams]);
+
+  // Handle hashtag routing for quick updates: /news#update-<id>
+  useEffect(() => {
+    const hash = location.hash;
+    if (hash && hash.startsWith("#update-")) {
+      const updateId = hash.replace("#update-", "");
+      if (updateId) {
+        const found = (news || []).find((item) => String(item.id) === String(updateId));
+        if (found) {
+          setSelectedUpdate(found);
+        } else if (fetchArticleById) {
+          fetchArticleById(updateId, user).then((fetched) => {
+            if (fetched) setSelectedUpdate(fetched);
+          });
+        }
+      }
+    } else if (!hash && selectedUpdate) {
+      setSelectedUpdate(null);
+    }
+  }, [location.hash, news, fetchArticleById, user]);
 
   // Deduplicate and filter news items by role:
   //   Admin / Super-Admin → see everything
@@ -641,11 +662,15 @@ const NewsPage = () => {
 
   const handleSelectUpdate = useCallback((update) => {
     setSelectedUpdate(update);
-  }, []);
+    if (update?.id) {
+      navigate({ hash: `update-${update.id}` }, { replace: true });
+    }
+  }, [navigate]);
 
   const handleCloseModal = useCallback(() => {
     setSelectedUpdate(null);
-  }, []);
+    navigate({ hash: "" }, { replace: true });
+  }, [navigate]);
 
   const handleNavigate = useCallback((path) => {
     navigate(path);
@@ -763,13 +788,37 @@ const NewsPage = () => {
               {/* Stories Grid (Updates - 3rd View Type) */}
               {updates.length > 0 && (
                 <div className="mb-10 md:mb-14">
-                  <div className="flex items-center gap-2 mb-4 px-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-theme-accent animate-pulse" />
-                    <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">
-                      Latest Updates
-                    </span>
+                  <div className="flex items-center justify-between mb-4 px-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-theme-accent animate-pulse" />
+                      <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">
+                        Latest Updates
+                      </span>
+                      <span className="text-[10px] text-white/30 font-medium">
+                        ({updates.length})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => scrollCarousel("left")}
+                        className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/10 active:scale-95 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-all cursor-pointer"
+                        aria-label="Previous updates"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button
+                        onClick={() => scrollCarousel("right")}
+                        className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/10 active:scale-95 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-all cursor-pointer"
+                        aria-label="Next updates"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex overflow-x-auto gap-4 md:gap-5 pb-6 pt-2 -mx-4 px-4 md:px-0 md:mx-0 custom-scrollbar snap-x snap-mandatory">
+                  <div
+                    ref={carouselRef}
+                    className="flex overflow-x-auto gap-4 md:gap-5 pb-6 pt-2 -mx-4 px-4 md:px-0 md:mx-0 custom-scrollbar snap-x snap-mandatory scroll-smooth"
+                  >
                     <div className="w-2 shrink-0 md:hidden"></div>
                     {updates.map((update) => (
                       <UpdateCard

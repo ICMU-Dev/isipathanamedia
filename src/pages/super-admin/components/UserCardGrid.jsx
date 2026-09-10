@@ -15,6 +15,8 @@ import {
 import ClearanceModal from "./ClearanceModal";
 import UserActionsModal from "./UserActionsModal";
 import { getRoleLabel, isSuperAdmin } from "../../../utils/roles";
+import { UserAvatar } from "../../../components/ui/avatar";
+import { cn } from "../../../lib/utils";
 
 const formatLastSeen = (timestamp) => {
   if (!timestamp) return "Never";
@@ -97,33 +99,18 @@ const UserCardGrid = ({
               <div className="flex flex-col items-center text-center relative z-10">
                 {/* Circular Avatar with Warmer Green Online Indicator Dot */}
                 <div className="relative mx-auto mb-2.5">
-                  <div className="w-14 h-14 rounded-full bg-zinc-950 border border-white/10 ring-2 ring-black/60 flex items-center justify-center text-xl font-bold text-white overflow-hidden shadow-lg relative">
-                    <span className="flex items-center justify-center w-full h-full text-zinc-300 font-semibold select-none">
-                      {u.full_name?.charAt(0)}
-                    </span>
-                    {u.avatar_url && (
-                      <img
-                        src={u.avatar_url}
-                        alt={u.full_name}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover absolute inset-0 z-10"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    )}
-                  </div>
-                  {/* Status Indicator Dot at Avatar Rim */}
-                  <div
-                    className={`absolute top-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#09090c] z-20 ${
+                  <UserAvatar
+                    user={u}
+                    size="xl"
+                    showBadge
+                    badgeClassName={cn(
+                      "w-3.5 h-3.5 border-2 border-[#09090c]",
                       u.is_active !== false
-                        ? "bg-green-500"
+                        ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.85)]"
                         : "bg-red-500"
-                    }`}
-                    title={
-                      u.is_active !== false ? "Active" : "Suspended"
-                    }
+                    )}
+                    className="bg-zinc-950 border border-white/10 ring-2 ring-black/60 shadow-lg"
+                    fallbackClassName="text-zinc-300 font-semibold"
                   />
                 </div>
 

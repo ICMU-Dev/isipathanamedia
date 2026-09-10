@@ -42,9 +42,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <meta data-rh="true" property="og:title" content="Isipathana College Media Unit – Official Website | ICMU | Nethinethera" />
   <meta data-rh="true" property="og:description"
     content="Official home of ICMU – Isipathana College Media Unit. 25+ years of cinematic storytelling. Discover Nethinethera (the media day) and Sandhwani at Isipathana College, Colombo." />
-  <meta data-rh="true" property="og:url" content="https://isipathanamedia.online/" />
+  <meta data-rh="true" property="og:url" content="%VITE_SITE_URL%/" />
   <meta data-rh="true" property="og:locale" content="en_LK" />
-  <meta data-rh="true" property="og:image" content="https://isipathanamedia.online/og-image.png" />
+  <meta data-rh="true" property="og:image" content="%VITE_SITE_URL%/og-image.png" />
   <meta data-rh="true" property="og:image:alt" content="Isipathana College Media Unit" />
   <meta data-rh="true" property="og:image:width" content="1200" />
   <meta data-rh="true" property="og:image:height" content="630" />
@@ -54,7 +54,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <meta data-rh="true" name="twitter:title" content="Isipathana College Media Unit – Official Website | ICMU" />
   <meta data-rh="true" name="twitter:description"
     content="Official website of ICMU – Isipathana College Media Unit. 25+ years of media excellence, 1000+ events covered annually. Discover Nethinethera & more." />
-  <meta data-rh="true" name="twitter:image" content="https://isipathanamedia.online/og-image.png" />
+  <meta data-rh="true" name="twitter:image" content="%VITE_SITE_URL%/og-image.png" />
 
   <!-- ═══ ADDITIONAL SEO SIGNALS ═══ -->
   <meta name="geo.region" content="LK-11" />
@@ -73,7 +73,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       "@type": "Organization",
       "name": "Isipathana College Media Unit",
       "alternateName": ["ICMU", "Isipathana Media"],
-      "url": "https://isipathanamedia.online",
+      "url": "%VITE_SITE_URL%",
       "description": "The official media unit of Isipathana College, Colombo. Producing cinematic content, covering 1000+ school events annually since 1999.",
       "foundingDate": "1999",
       "slogan": "No Sacrifice, No Victory",
@@ -103,10 +103,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Isipathana College Media Unit",
-      "url": "https://isipathanamedia.online",
+      "url": "%VITE_SITE_URL%",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://isipathanamedia.online/?q={search_term_string}",
+        "target": "%VITE_SITE_URL%/?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
@@ -118,29 +118,30 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://isipathanamedia.online/" },
-        { "@type": "ListItem", "position": 2, "name": "About", "item": "https://isipathanamedia.online/about" },
-        { "@type": "ListItem", "position": 3, "name": "Nethinethera", "item": "https://isipathanamedia.online/nethinethera" }
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "%VITE_SITE_URL%/" },
+        { "@type": "ListItem", "position": 2, "name": "About", "item": "%VITE_SITE_URL%/about" },
+        { "@type": "ListItem", "position": 3, "name": "Nethinethera", "item": "%VITE_SITE_URL%/nethinethera" }
       ]
     }
   </script>
 
   <!-- ═══ GOOGLE ANALYTICS (gtag.js) ═══ -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z19RE9T1TY"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=%VITE_GA_MEASUREMENT_ID%"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
-    gtag('config', 'G-Z19RE9T1TY', {
+    gtag('config', '%VITE_GA_MEASUREMENT_ID%', {
       page_title: document.title,
       send_page_view: true,
       cookie_flags: 'SameSite=None;Secure'
     });
   </script>
 
-  <!-- ═══ PRECONNECTS FOR PERFORMANCE ═══ -->
+  <!-- ═══ PRECONNECTS & FONTS FOR PERFORMANCE ═══ -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=VT323&display=swap" />
   <link rel="preconnect" href="https://www.googletagmanager.com" />
   <link rel="dns-prefetch" href="https://www.google-analytics.com" />
 </head>

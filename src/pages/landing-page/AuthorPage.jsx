@@ -24,7 +24,7 @@ import { getPublicAuthorName, isInstitutionAuthor } from "../../utils/authorUtil
 const AuthorPage = () => {
   const { authorName: urlAuthorName } = useParams();
   const decodedAuthorName = decodeURIComponent(urlAuthorName || "");
-  const { news, fetchNews, webUsers, fetchWebUsers, isFetching, loading } = useData();
+  const { news, fetchNews, isFetching, loading } = useData();
   const { user } = useAuth();
   
   const userRole = user?.role?.toLowerCase();
@@ -35,8 +35,8 @@ const AuthorPage = () => {
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    Promise.all([fetchNews(true), fetchWebUsers()]);
-  }, [fetchNews, fetchWebUsers]);
+    fetchNews(false, 0, 30);
+  }, [fetchNews]);
 
   const isICMU = isInstitutionAuthor(decodedAuthorName);
   const displayAuthorName = getPublicAuthorName(decodedAuthorName);
@@ -179,20 +179,12 @@ const AuthorPage = () => {
 
               <div className="mt-8 flex items-center gap-6 justify-center md:justify-start">
                 <div className="flex flex-col">
-                  <span className="text-2xl font-black text-white">
-                    {articles.length}
+                  <span className="text-[14px] text-white/40 font-bold uppercase tracking-widest">
+                    {articles.length}                     Articles Published
                   </span>
-                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">
-                    Articles Published
-                  </span>
+                 
                 </div>
-                <div className="w-px h-10 bg-white/10"></div>
-                <div className="flex flex-col">
-                  <span className="text-2xl font-black text-white">100%</span>
-                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">
-                    Dedication
-                  </span>
-                </div>
+                
               </div>
             </div>
           </div>

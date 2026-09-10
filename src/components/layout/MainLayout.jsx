@@ -12,22 +12,22 @@ const Preloader = ({ onComplete }) => {
       className="fixed inset-0 z-[99999] bg-[#050505] flex flex-col items-center justify-center pointer-events-none will-change-transform"
       initial={{ top: 0, height: "100vh" }}
       animate={{ top: "-100vh", height: "100vh" }}
-      transition={{ duration: 0.8, ease: [0.76, 0, 0.24, 1], delay: 2.5 }}
+      transition={{ duration: 0.8, ease: [0.76, 0, 0.24, 1], delay: 2.2 }}
       onAnimationComplete={onComplete}
     >
       <div className="relative h-20 w-full flex items-center justify-center overflow-hidden">
         <motion.h1
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
-          animate={{ opacity: [0, 1, 1, 0], y: [10, 0, 0, -10], scale: [0.98, 1, 1, 1.05] }}
-          transition={{ duration: 1.2, times: [0, 0.2, 0.8, 1], ease: "easeInOut" }}
+          initial={{ opacity: 0, y: 15, scale: 0.98 }}
+          animate={{ opacity: [0, 1, 1, 0], y: [15, 0, 0, -15], scale: [0.98, 1, 1, 1.05] }}
+          transition={{ duration: 0.9, times: [0, 0.2, 0.8, 1], ease: "easeInOut" }}
           className="absolute text-3xl md:text-5xl tracking-[0.2em] uppercase font-medium will-change-transform"
         >
           NO SACRIFICE
         </motion.h1>
         <motion.h1
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
-          animate={{ opacity: [0, 1, 1, 0], y: [10, 0, 0, -10], scale: [0.98, 1, 1, 1.05] }}
-          transition={{ duration: 1.2, times: [0, 0.2, 0.8, 1], delay: 1.1, ease: "easeInOut" }}
+          initial={{ opacity: 0, y: 15, scale: 0.98 }}
+          animate={{ opacity: [0, 1, 1, 0], y: [15, 0, 0, -15], scale: [0.98, 1, 1, 1.05] }}
+          transition={{ duration: 0.9, times: [0, 0.2, 0.8, 1], delay: 0.8, ease: "easeInOut" }}
           className="absolute text-3xl md:text-5xl tracking-[0.2em] uppercase font-medium will-change-transform"
         >
           NO VICTORY
@@ -35,8 +35,8 @@ const Preloader = ({ onComplete }) => {
       </div>
       <motion.div 
         initial={{ opacity: 0 }}
-        animate={{ opacity: 0.2 }}
-        transition={{ delay: 0.5 }}
+        animate={{ opacity: 0.25 }}
+        transition={{ delay: 0.3 }}
         className="absolute bottom-10 text-[10px] tracking-[0.5em] uppercase will-change-opacity"
       >
         SINCE 1999
@@ -48,24 +48,16 @@ const Preloader = ({ onComplete }) => {
 const MainLayout = ({ children }) => {
   const location = useLocation();
   const outlet = useOutlet();
-  const [isFirstLoad] = useState(true);
   
-  // If it's the first load, we wait for the preloader. Otherwise, wipe is complete instantly.
-  const [isWipeComplete, setIsWipeComplete] = useState(!isFirstLoad);
-  
-  // State to fully unmount the preloader component once it's done
-  const [showPreloader, setShowPreloader] = useState(isFirstLoad);
+  const [isWipeComplete, setIsWipeComplete] = useState(false);
+  const [showPreloader, setShowPreloader] = useState(true);
 
   useEffect(() => {
-    if (isFirstLoad) {
-      // The Preloader takes 2.5s before it starts sliding up. 
-      // We want GSAP to initialize perfectly as it slides up.
-      const timer = setTimeout(() => {
-        setIsWipeComplete(true);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [isFirstLoad]);
+    const timer = setTimeout(() => {
+      setIsWipeComplete(true);
+    }, 2200);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="min-h-[50vh] font-sans text-white bg-dark flex flex-col">

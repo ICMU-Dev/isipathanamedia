@@ -368,7 +368,7 @@ export const testCases = [
       const efContent = fs.readFileSync(efPath, "utf-8");
 
       assert.ok(efContent.includes("webpush.setVapidDetails"), "Edge function missing setVapidDetails call");
-      assert.ok(efContent.includes("mailto:admin@isipathanamedia.online"), "Edge function missing VAPID contact email");
+      assert.ok(efContent.includes("VAPID_SUBJECT") || efContent.includes("mailto:"), "Edge function missing VAPID contact configuration");
     },
   },
   {

@@ -77,6 +77,25 @@ export const DEFAULT_CUSTOM_THEME = {
 
 // Full Complex Theme Presets defining backgrounds, card surfaces, text, fonts, borders & accents
 export const THEMES = {
+  // --- OFFICIAL BRAND (V2 DESIGN SYSTEM) ---
+  icmu_v2: {
+    id: "icmu_v2",
+    name: "ICMU Studio v2",
+    category: "Official Brand",
+    bg: "#010F0B",
+    cardBg: "#011D17",
+    inputBg: "#001611",
+    border: "rgba(209, 250, 229, 0.08)",
+    textPrimary: "#D1FAE5",
+    textSecondary: "#8FAEA0",
+    accent: "#1EB957",
+    accentBrand: "#178740",
+    accentRgb: "30, 185, 87",
+    fontFamily: "'Montserrat', sans-serif",
+    description: "Official v2 brand: Deep Forest (#010F0B), Emerald Card (#011D17), Mint Cream (#D1FAE5) & Isipathana Green",
+    motto: "No Sacrifice, No Victory",
+  },
+
   // --- DARK MODES (OLED OPTIMIZED) ---
   green: {
     id: "green",
@@ -362,7 +381,7 @@ export const ThemeProvider = ({ children }) => {
 
   const [themeTrigger, setThemeTrigger] = useState(0);
 
-  const theme = themeId === 'custom' ? (customTheme || DEFAULT_CUSTOM_THEME) : (THEMES[themeId] || THEMES.green);
+  const theme = themeId === 'custom' ? (customTheme || DEFAULT_CUSTOM_THEME) : (THEMES[themeId] || THEMES.icmu_v2 || THEMES.green);
 
   // Apply complete CSS custom properties to root dynamically
   useEffect(() => {
@@ -372,7 +391,7 @@ export const ThemeProvider = ({ children }) => {
       const extras = deriveThemeExtras(customTheme);
       t = { ...customTheme, ...extras };
     } else {
-      t = THEMES[themeId] || THEMES.green;
+      t = THEMES[themeId] || THEMES.icmu_v2 || THEMES.green;
     }
     root.style.setProperty("--admin-bg", t.bg);
     root.style.setProperty("--admin-card-bg", t.cardBg);

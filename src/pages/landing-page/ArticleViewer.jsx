@@ -1,5 +1,6 @@
 import Loader from "../../components/ui/Loader";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
@@ -19,16 +20,18 @@ import {
   Play,
   ArrowRight,
   BadgeCheck,
+  X,
 } from "lucide-react";
 import iconLogo from "../../assets/image.png";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import DOMPurify from "dompurify";
 import AnimatedBg from "../../components/ui/AnimatedBg";
 import SEO from "../../components/SEO";
 import ImageWithLoader from "../../components/ui/ImageWithLoader";
 import { getPublicAuthorName, isInstitutionAuthor } from "../../utils/authorUtils";
 
-const SITE_URL = "https://isipathanamedia.online";
+const SITE_URL = import.meta.env.VITE_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
 
 
@@ -173,10 +176,109 @@ const MobileShareBar = ({ article }) => {
   );
 };
 
+/**
+ * Automatically groups consecutive article images into a responsive Tailwind masonry gallery.
+ */
+const groupConsecutiveImagesToMasonry = (htmlContent) => {
+  if (!htmlContent || typeof window === "undefined" || !window.DOMParser) {
+    return htmlContent || "";
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${htmlContent}</div>`, "text/html");
+    const container = doc.body.firstElementChild;
+    if (!container) return htmlContent;
+
+    const isImageBlock = (el) => {
+      if (!el || el.nodeType !== 1) return false;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "img") return true;
+      if (["p", "figure", "div"].includes(tag)) {
+        const imgs = el.querySelectorAll("img");
+        if (imgs.length > 0) {
+          const text = el.textContent.trim();
+          if (text === "") return true;
+        }
+      }
+      return false;
+    };
+
+    const extractImages = (el) => {
+      if (!el || el.nodeType !== 1) return [];
+      if (el.tagName.toLowerCase() === "img") return [el];
+      return Array.from(el.querySelectorAll("img"));
+    };
+
+    const children = Array.from(container.children);
+    let i = 0;
+    while (i < children.length) {
+      const child = children[i];
+      if (isImageBlock(child)) {
+        const streak = [child];
+        let j = i + 1;
+        while (j < children.length && isImageBlock(children[j])) {
+          streak.push(children[j]);
+          j++;
+        }
+
+        const allImgs = streak.flatMap(extractImages);
+        if (allImgs.length >= 2) {
+          // Build masonry gallery container
+          const gallery = doc.createElement("div");
+          
+          if (allImgs.length === 2) {
+            // Exactly 2 images: 2-column grid side-by-side even on mobile (no 1-by-1 stack)
+            gallery.className = "not-prose my-6 grid grid-cols-2 gap-2 sm:gap-3.5 items-start";
+          } else {
+            // 3+ images: keep multi-column masonry on mobile (columns-2), scaled down proportionally
+            const colClass =
+              allImgs.length >= 7
+                ? "columns-2 sm:columns-3 lg:columns-4"
+                : "columns-2 sm:columns-3";
+            gallery.className = `not-prose my-6 sm:my-8 ${colClass} gap-2 sm:gap-3.5`;
+          }
+
+          allImgs.forEach((img) => {
+            const item = doc.createElement("div");
+            // mb-2 sm:mb-3.5 provides exact vertical gap matching the horizontal gap, NO space-y-*
+            item.className =
+              "break-inside-avoid mb-2 sm:mb-3.5 overflow-hidden rounded-xl sm:rounded-2xl border border-white/10 bg-white/[0.02] shadow-md group relative cursor-zoom-in transition-all duration-300 hover:border-white/25 hover:scale-[1.01]";
+
+            const newImg = doc.createElement("img");
+            newImg.src = img.src;
+            newImg.alt = img.alt || "Article gallery image";
+            newImg.loading = "lazy";
+            newImg.decoding = "async";
+            newImg.className =
+              "w-full h-auto object-cover rounded-xl sm:rounded-2xl block transition-transform duration-300";
+
+            item.appendChild(newImg);
+            gallery.appendChild(item);
+          });
+
+          container.replaceChild(gallery, streak[0]);
+          for (let k = 1; k < streak.length; k++) {
+            container.removeChild(streak[k]);
+          }
+          i = j;
+          continue;
+        }
+      }
+      i++;
+    }
+
+    return container.innerHTML;
+  } catch (err) {
+    console.error("Gallery masonry transform error:", err);
+    return htmlContent;
+  }
+};
+
 // ─── Main Component ──────────────────────────────────────────────
 const ArticleViewer = () => {
   const { id } = useParams();
-  const { news, fetchNews, fetchWebUsers, fetchArticleById } = useData();
+  const { news, fetchNews, fetchArticleById } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [fetchComplete, setFetchComplete] = useState(false);
@@ -191,21 +293,31 @@ const ArticleViewer = () => {
     let active = true;
     
     setFetchComplete(false);
-    setArticle(null);
+    // Check if already in news cache and is an update
+    const cached = (news || []).find((n) => String(n.id) === String(id));
+    if (cached?.type === 'update') {
+      navigate(`/news#update-${cached.id}`, { replace: true });
+      return;
+    }
 
-    // Fetch in parallel to eliminate waterfall delays
-    Promise.all([
-      fetchWebUsers(),
-      fetchNews(),
-      fetchArticleById(id, user)
-    ]).then(([_, __, fetchedArticle]) => {
+    // Immediately fetch the requested article to maximize LCP and render speed
+    fetchArticleById(id, user).then((fetchedArticle) => {
       if (!active) return;
+      if (fetchedArticle?.type === 'update') {
+        navigate(`/news#update-${fetchedArticle.id}`, { replace: true });
+        return;
+      }
       setArticle(fetchedArticle);
       setFetchComplete(true);
     });
+
+    // Background fetch general news for related articles if not already loaded
+    if (!news || news.length === 0) {
+      fetchNews();
+    }
     
     return () => { active = false; };
-  }, [id, user, fetchNews, fetchWebUsers, fetchArticleById]);
+  }, [id, user, fetchArticleById, fetchNews, news?.length]);
 
   useEffect(() => {
     if (fetchComplete) {
@@ -220,6 +332,36 @@ const ArticleViewer = () => {
       }
     }
   }, [fetchComplete, article]);
+
+  const [activeLightboxImage, setActiveLightboxImage] = useState(null);
+
+  useEffect(() => {
+    if (!activeLightboxImage) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setActiveLightboxImage(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeLightboxImage]);
+
+  const handleArticleImageClick = (e) => {
+    const img = e.target.closest("img");
+    if (img && img.src && !img.classList.contains("no-lightbox") && !img.closest("header")) {
+      setActiveLightboxImage({
+        src: img.src,
+        alt: img.alt || article?.title || "Article image",
+      });
+    }
+  };
+
+  // Group consecutive images into masonry gallery (must be declared before conditional returns)
+  const processedContent = useMemo(() => {
+    const raw = article?.content || "";
+    const sanitized = DOMPurify.sanitize(raw);
+    return groupConsecutiveImagesToMasonry(sanitized);
+  }, [article?.content]);
 
   if (loading) {
     return (
@@ -429,6 +571,7 @@ const ArticleViewer = () => {
               <ImageWithLoader
                 src={article.image}
                 alt={article.title}
+                priority={true}
                 imageClassName="w-full h-full object-contain aspect-video relative z-10"
               />
             </div>
@@ -447,6 +590,7 @@ const ArticleViewer = () => {
           {/* Article Body */}
           <main className="flex-1 min-w-0 max-w-3xl">
             <div
+              onClick={handleArticleImageClick}
               className="prose prose-invert prose-sm sm:prose-base md:prose-lg font-light leading-relaxed
                             prose-p:text-white/80 prose-p:mb-4 sm:prose-p:mb-8
                             prose-headings:font-black prose-headings:tracking-tight prose-headings:text-white
@@ -460,7 +604,7 @@ const ArticleViewer = () => {
                             prose-video:rounded-2xl sm:prose-video:rounded-2xl prose-video:border prose-video:border-white/[0.06] 
                             [&_iframe]:rounded-2xl sm:[&_iframe]:rounded-2xl [&_iframe]:border [&_iframe]:border-white/[0.06]  [&_iframe]:shadow-xl sm:[&_iframe]:shadow-2xl [&_iframe]:my-6 sm:[&_iframe]:my-10 [&_iframe]:w-full [&_iframe]:aspect-video">
               <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                {article.content}
+                {processedContent}
               </ReactMarkdown>
             </div>
 
@@ -546,6 +690,39 @@ const ArticleViewer = () => {
           </main>
         </div>
       </article>
+
+      {/* Fullscreen Lightbox Modal */}
+      {activeLightboxImage && createPortal(
+        <div
+          className="fixed inset-0 z-[400] bg-black/95 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
+          onClick={() => setActiveLightboxImage(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveLightboxImage(null)}
+            aria-label="Close image viewer"
+            className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer shadow-lg"
+          >
+            <X size={20} />
+          </button>
+          <div
+            className="relative max-w-5xl max-h-[90vh] w-full flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={activeLightboxImage.src}
+              alt={activeLightboxImage.alt}
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10 select-none"
+            />
+            {activeLightboxImage.alt && activeLightboxImage.alt !== "Article gallery image" && (
+              <p className="mt-3 text-xs sm:text-sm text-white/60 text-center max-w-2xl px-4 line-clamp-2">
+                {activeLightboxImage.alt}
+              </p>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

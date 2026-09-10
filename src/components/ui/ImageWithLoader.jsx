@@ -18,6 +18,7 @@ const ImageWithLoader = ({
   imageClassName = "w-64 sm:w-40 h-32 sm:h-40 object-cover scale-125",
   fallbackIconClassName = "w-64 sm:w-40 h-32 sm:h-40 opacity-40 object-contain grayscale scale-125",
   fallbackContainerClassName = "bg-white/[0.02]",
+  priority = false,
 }) => {
   const [isLoaded, setIsLoaded] = useState(() => (src ? loadedImageCache.has(src) : false));
   const [hasError, setHasError] = useState(false);
@@ -65,6 +66,9 @@ const ImageWithLoader = ({
         <img
           src={src}
           alt={alt || "Media"}
+          fetchPriority={priority ? "high" : "auto"}
+          loading={priority ? "eager" : "lazy"}
+          decoding={priority ? "sync" : "async"}
           className={`${imageClassName} ${
             isLoaded ? "opacity-100" : "opacity-0"
           } transition-opacity duration-500`}

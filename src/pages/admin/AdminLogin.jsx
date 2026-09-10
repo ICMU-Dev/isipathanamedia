@@ -19,6 +19,7 @@ import MainLogos from "../../assets/main-logos.png";
 import NotFoundPage from "../NotFoundPage";
 import Strands from "../../components/ui/Strands";
 import DotField from "../../components/ui/DotField";
+import { UserAvatar } from "../../components/ui/avatar";
 import { getDefaultDashboardPath } from "../../utils/roles";
 
 const AdminLogin = ({ urlIndexNo }) => {
@@ -115,43 +116,42 @@ const AdminLogin = ({ urlIndexNo }) => {
 
       if (!result.found) {
         setView("404");
-      } else if (result.is_active === false) {
-        setAdminName(result.name || "");
-        setAdminRole(result.role || "");
+        return;
+      }
 
-        // Use RPC to fetch avatar (bypasses RLS — no session at login page)
+      setAdminName(result.name || result.full_name || "");
+      setAdminRole(result.role || "");
+
+      const directAvatar = result.avatar_url || result.avatarUrl || result.profile || result.profile_picture;
+      if (directAvatar) {
+        setAdminAvatar(directAvatar);
+      }
+      if (result.email) {
+        setHasLinkedGoogle(true);
+      }
+
+      // Single fallback only if avatar or email was not in checkUser response
+      if (!directAvatar || !result.email) {
         try {
           const { supabase } = await import("../../lib/supabaseClient");
           const { data } = await supabase.rpc("get_user_by_index", {
             p_index_number: urlIndexNo,
           });
-          if (data?.avatar_url) setAdminAvatar(data.avatar_url);
-        } catch (err) {
-          console.error(err);
-        }
-
-        setView("suspended");
-      } else {
-        setAdminName(result.name || "");
-        setAdminRole(result.role || "");
-
-        // Check if they have an email linked for Google Auth
-        // Uses RPC to bypass RLS (no session exists at the login page)
-        try {
-          const { supabase } = await import("../../lib/supabaseClient");
-          const { data } = await supabase.rpc("get_user_by_index", {
-            p_index_number: urlIndexNo,
-          });
-          if (data?.email) {
+          if (data?.email && !result.email) {
             setHasLinkedGoogle(true);
           }
-          if (data?.avatar_url) {
-            setAdminAvatar(data.avatar_url);
+          const fetchedAvatar = data?.avatar_url || data?.profile || data?.profile_picture;
+          if (fetchedAvatar && !directAvatar) {
+            setAdminAvatar(fetchedAvatar);
           }
         } catch (err) {
-          console.error(err);
+          console.error("[AdminLogin] Avatar/email fallback lookup error:", err);
         }
+      }
 
+      if (result.is_active === false) {
+        setView("suspended");
+      } else {
         setView(result.needs_setup ? "initialize" : "login");
       }
     })();
@@ -291,20 +291,13 @@ const AdminLogin = ({ urlIndexNo }) => {
 
               {/* Reworked Login Chip */}
               <div className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-white/5 border border-white/5 backdrop-blur-md shadow-lg shadow-black/20 group hover:border-white/20 transition-all cursor-default ">
-                <div className="w-9 h-9 rounded-full bg-theme-accent/5 flex items-center justify-center border border-theme-accent/30 group-hover:bg-theme-accent/20 group-hover:scale-105 transition-all duration-300 overflow-hidden">
-                  {adminAvatar ? (
-                    <img
-                      src={adminAvatar}
-                      alt={adminName}
-                      className="w-full h-full object-cover"
-                      onError={(e) => (e.currentTarget.style.display = "none")}
-                    />
-                  ) : (
-                    <span className="text-[var(--accent)] font-bold text-sm">
-                      {adminName.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
+                <UserAvatar
+                  src={adminAvatar}
+                  name={adminName}
+                  size="md"
+                  className="bg-theme-accent/5 border border-theme-accent/30 group-hover:bg-theme-accent/20 group-hover:scale-105 transition-all duration-300"
+                  fallbackClassName="text-[var(--accent)] font-bold text-sm"
+                />
                 <div className="flex flex-col items-start pr-2">
                   <span className="text-white/90 text-sm font-semibold truncate max-w-[150px]">
                     {adminName}

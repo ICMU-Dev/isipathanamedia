@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import ReactCrop, { centerCrop, makeAspectCrop, convertToPixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { X, Crop, Check, Loader2 } from "lucide-react";
@@ -29,12 +30,17 @@ const ImageCropperModal = ({
   aspectRatio = 16 / 9,
   aspectRatioLabel,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const imgRef = useRef(null);
 
-  if (!isOpen || !imageSrc) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !imageSrc || !mounted) return null;
 
   const currentRatio = aspectRatio || 16 / 9;
   const isPortrait = Math.abs(currentRatio - 3 / 4) < 0.05;
@@ -123,9 +129,28 @@ const ImageCropperModal = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="bg-[var(--admin-input-bg)] border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl max-w-3xl w-full flex flex-col max-h-[90vh]">
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !isProcessing) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isProcessing, onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[260] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isProcessing) onClose();
+      }}
+    >
+      <div
+        className="bg-[var(--admin-input-bg)] border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl max-w-3xl w-full flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/[0.06]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-theme-accent/10 flex items-center justify-center text-theme-accent">
@@ -139,8 +164,10 @@ const ImageCropperModal = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-white/50 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] rounded-full transition-colors">
+            aria-label="Close cropper"
+            className="p-2 text-white/50 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] rounded-full transition-colors cursor-pointer">
             <X size={18} />
           </button>
         </div>
@@ -165,14 +192,16 @@ const ImageCropperModal = ({
 
         <div className="p-4 md:p-6 border-t border-white/[0.06] flex items-center justify-end gap-3 bg-[var(--admin-input-bg)]">
           <button
+            type="button"
             onClick={onClose}
-            className="px-6 py-3 rounded-2xl border border-white/[0.06] text-white/70 hover:text-white hover:bg-white/[0.05] text-xs font-bold uppercase tracking-widest transition-all">
+            className="px-6 py-3 rounded-2xl border border-white/[0.06] text-white/70 hover:text-white hover:bg-white/[0.05] text-xs font-bold uppercase tracking-widest transition-all cursor-pointer">
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={isProcessing}
-            className="px-8 py-3 rounded-2xl bg-theme-accent text-black hover:bg-[#00cc00] shadow-[0_0_15px_rgba(0,255,0,0.2)] text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="px-8 py-3 rounded-2xl bg-theme-accent text-black hover:bg-[#00cc00] shadow-[0_0_15px_rgba(0,255,0,0.2)] text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
             {isProcessing ? (
               <>
                 <Loader2 size={16} className="animate-spin" /> Cropping...
@@ -185,7 +214,8 @@ const ImageCropperModal = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

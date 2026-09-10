@@ -29,13 +29,23 @@ import { useAuth } from "../../context/AuthContext";
 import { Link, useParams } from "react-router-dom";
 import ChangelogPanel from "../../components/admin/dashboard/ChangelogPanel";
 import { ArticleSystemModal } from "../../components/admin/dashboard/ChangelogModal";
+import changelogsData from "../../data/changelogs.json";
 import StatCard from "../../components/admin/dashboard/StatCard";
 import DashboardSkeleton from "../../components/admin/DashboardSkeleton";
 import { AnimatedNumber } from "../../components/motion/animated-number";
 import { isAdmin, isWriter as checkIsWriter } from "../../utils/roles";
 
 const Dashboard = () => {
-  const { stats, news = [], messages = [], team = [], siteConfig = {}, isFetching } = useData();
+  const {
+    stats,
+    news = [],
+    messages = [],
+    team = [],
+    siteConfig = {},
+    isFetching,
+    fetchAdminData,
+    isAdminDataLoading,
+  } = useData();
   const { adminPath } = useParams();
   const { user } = useAuth();
 
@@ -43,199 +53,16 @@ const Dashboard = () => {
 
   const isWriter = checkIsWriter(user?.role) && !isAdmin(user?.role);
 
+  React.useEffect(() => {
+    if (fetchAdminData) {
+      fetchAdminData();
+    }
+  }, [fetchAdminData]);
+
   const [showUpdateModal, setShowUpdateModal] = React.useState(false);
   const [selectedLog, setSelectedLog] = React.useState(null);
 
-  const changelogs = [
-    {
-      id: "ui-visual-polish",
-      title: "UI Enhancements & Visual Polish",
-      subtitle: "UI & Aesthetics",
-      desc: "Fixed systemic visual bugs related to thick white outlines and improved layout consistency across the admin panel.",
-      date: "Just now",
-      isMajor: false,
-      badge: "BUG FIXES",
-      steps: [
-        {
-          t: "Visual Accent Fixes",
-          d: "Resolved an issue where semi-transparent accent borders were rendering as solid white outlines.",
-        },
-        {
-          t: "Tailwind Optimization",
-          d: "Optimized the Tailwind CSS configuration to properly support dynamic alpha values for theme accents.",
-        },
-      ],
-    },
-    {
-      id: "auth-notifications-update",
-      title: "MAJOR UPDATE: Google Login & Linked Devices",
-      subtitle: "Authentication & Security",
-      desc: "Fixed Google login integration, introduced linked device management, and deployed a new notification system.",
-      date: "Recent",
-      isMajor: true,
-      badge: "FEATURE RELEASE",
-      steps: [
-        {
-          t: "Google Login Integration",
-          d: "Resolved authentication issues with Google login, ensuring a seamless and secure sign-in experience.",
-        },
-        {
-          t: "Linked Devices",
-          d: "Added the ability to view and manage active sessions across different devices directly from your profile settings.",
-        },
-        {
-          t: "Push Notification System",
-          d: "Implemented a robust push notification system for real-time alerts and admin events.",
-        },
-        {
-          t: "Splash Screen Optimization",
-          d: "Fixed visual glitches and optimized the loading sequence of the application splash screen for a smoother initial load.",
-        },
-      ],
-    },
-    {
-      id: "latest-updates-admin",
-      title: "Admin Panel Enhancements",
-      subtitle: "UI, Haptics & Notifications",
-      desc: "Subtle haptics for mobile nav, super admin notifications, and faster changelog modal.",
-      date: "Recent",
-      isMajor: false,
-      badge: "SYSTEM UPDATE",
-      steps: [
-        {
-          t: "Mobile Nav Haptics",
-          d: "Subtle vibration feedback when interacting with bottom navigation items on mobile.",
-        },
-        {
-          t: "Super Admin Push Notifications",
-          d: "Real-time web push notifications when new feedbacks or bugs are submitted.",
-        },
-        {
-          t: "Optimized Changelog Modal",
-          d: "Faster, subtle fade animations replacing the slower staggered bounce animations for a snappier feel.",
-        },
-        {
-          t: "Dashboard PWA Integration",
-          d: "Install App prompt card now accessible directly in Settings to install the dashboard as a PWA.",
-        },
-      ],
-    },
-    {
-      id: 0,
-      title: "Feedback & Bug Reporting System",
-      subtitle: "Admin Experience & Quality",
-      desc: "New subtle floating widget (Ctrl+Shift+F) to report bugs, suggest features, and track status in Settings.",
-      date: "Recent",
-      isMajor: false,
-      badge: "FEATURE RELEASE",
-      steps: [
-        {
-          t: "Subtle Floating Trigger",
-          d: "Subtle icon button fixed on every admin page (or press Ctrl+Shift+F) to report bugs or suggest enhancements.",
-        },
-        {
-          t: "Auto Context Detection",
-          d: "Automatically includes reporter name, role, device type (desktop/mobile/tablet), and page URL in the report.",
-        },
-        {
-          t: "Feedbacks Management Panel",
-          d: "Settings page includes a filterable Feedbacks tab for admins and super-admins to track open issues.",
-        },
-        {
-          t: "Super-Admin Controls",
-          d: "Super-admins can update status (Open -> In Progress -> Resolved -> Won't Fix), post official replies, and manage reports.",
-        },
-        {
-          t: "About Section",
-          d: "New About tab in Settings detailing app version, tech stack, and shortcut keys.",
-        },
-      ],
-    },
-    {
-      id: 1,
-      title: "Database Optimization & Security",
-      subtitle: "Backend & RLS Updates",
-      desc: "Under-maintenance optimization fixing security permissions, row-level security headers, and session TTLs.",
-      date: "Recent",
-      isMajor: false,
-      badge: "SECURITY PATCH",
-      steps: [
-        {
-          t: "Row-Level Security (RLS)",
-          d: "Custom fetch wrapper injects user index headers for exact row-level security enforcement.",
-        },
-        {
-          t: "Session Persistence",
-          d: "Support for remember-me session persistence (30 days) and automatic token refreshes.",
-        },
-        {
-          t: "Real-time Subscriptions",
-          d: "Optimized WebSocket channel listeners for real-time presence and database updates.",
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: "Mobile UI Redesign",
-      subtitle: "Admin Interface UX Overhaul",
-      desc: "Complete redesign of the admin dashboard with advanced glassmorphism, dynamic headers, and optimized mobile layouts.",
-      date: "Recent",
-      isMajor: false,
-      badge: "UI OVERHAUL",
-      steps: [
-        {
-          t: "Dynamic Mobile Header",
-          d: "Sleek glassmorphism header with active role badges and quick navigation drawer.",
-        },
-        {
-          t: "Collapsible Sidebar",
-          d: "Persistent collapsed icon mode for desktop to maximize workspace area.",
-        },
-        {
-          t: "Responsive Stats",
-          d: "Swipeable & compact stat cards optimized for smaller screen viewports.",
-        },
-      ],
-    },
-    {
-      id: 3,
-      title: "Profile & Access Management",
-      subtitle: "User Security & Customization",
-      desc: "Premium, mobile-first rebuild of profile and access management with real-time avatar tracking.",
-      date: "Recent",
-      isMajor: false,
-      badge: "USER PROFILES",
-      steps: [
-        {
-          t: "Avatar Cropping Modal",
-          d: "Integrated image cropping modal for crisp user profile avatars.",
-        },
-        {
-          t: "Device Session Tracking",
-          d: "Parses user-agent to monitor active devices and operating system sessions.",
-        },
-      ],
-    },
-    {
-      id: 4,
-      title: "Modern Theme Selector",
-      subtitle: "Appearance & Personalization",
-      desc: "New swipeable carousel for theme selection featuring smooth transitions and ambient glow effects.",
-      date: "Recent",
-      isMajor: false,
-      badge: "THEMING",
-      steps: [
-        {
-          t: "Theme Architectures",
-          d: "Choose between default dark mode, glassmorphism, or sleek minimal skins.",
-        },
-        {
-          t: "Accent Palette",
-          d: "Instant accent color switching with real-time theme context propagation.",
-        },
-      ],
-    },
-  ];
+  const changelogs = changelogsData || [];
 
   const handleOpenLogModal = (logItem) => {
     setSelectedLog(logItem || changelogs[0]);
@@ -283,6 +110,7 @@ const Dashboard = () => {
     ).length;
 
     const recentArticles = [...allArticles]
+      .filter((a) => a.status?.toLowerCase() !== "draft")
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 4);
 
@@ -359,7 +187,7 @@ const Dashboard = () => {
     }));
   }, [dashboardData]);
 
-  if (isFetching && (!stats || news.length === 0)) {
+  if ((isFetching || isAdminDataLoading) && (!stats || news.length === 0)) {
     return <DashboardSkeleton />;
   }
 
@@ -748,7 +576,7 @@ const Dashboard = () => {
                 return (
                   <Link
                     key={article.id}
-                    to={`${basePath}/dashboard/news/edit/${article.id}`}
+                    to={`${basePath}/dashboard/news#view-${article.id}`}
                     className="flex items-center gap-3 p-3 bg-[var(--admin-input-bg)] rounded-2xl hover:border-theme-accent/ border border-[var(--admin-border)] hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all group/item"
                   >
                     {/* Thumbnail */}

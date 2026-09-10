@@ -11,34 +11,31 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("push", (event) => {
   console.log("[Service Worker] Push Received.");
 
-  let body = "New notification";
-  let title = "ICMU Update";
-  let url = "/";
-
-  if (event.data) {
-    try {
-      const data = event.data.json();
-      title = data.title || title;
-      body = data.body || body;
-      url = data.data?.url || data.url || url;
-    } catch (e) {
-      body = event.data.text();
-    }
-  }
+  let body = "You have a new update.";
+  let title = "ICMU Notification";
+  let url = "/admin/feedback";
+  let icon = "/icmu-logo.png";
+  let badge = "/favicon-96x96.png";
 
   let options = {
-    body: body,
-    icon: "/web-app-manifest-192x192.png",
-    badge: "/favicon-96x96.png",
-    data: { url: url }
+    body,
+    icon,
+    badge,
+    data: { url }
   };
 
   if (event.data) {
     try {
       const data = event.data.json();
       title = data.title || title;
-      // Merge all data (including actions, swapped icons) directly into options
-      options = { ...options, ...data, data: { url: data.data?.url || data.url || url } };
+      options = {
+        ...options,
+        ...data,
+        body: data.body || body,
+        icon: data.icon || icon,
+        badge: data.badge || badge,
+        data: { url: data.data?.url || data.url || url }
+      };
     } catch (e) {
       options.body = event.data.text();
     }

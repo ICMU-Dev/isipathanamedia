@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
@@ -79,9 +80,9 @@ const LiveStreamSettings = () => {
 
   // ─── Realtime Presence for Admins ───
   useEffect(() => {
-    if (!user || !supabase) return;
+    if (!user?.id || !supabase) return;
     const channel = supabase.channel("admin_presence_livestream", {
-      config: { presence: { key: user.id } },
+      config: { presence: { key: String(user.id) } },
     });
 
     channel
@@ -97,8 +98,8 @@ const LiveStreamSettings = () => {
         if (status === "SUBSCRIBED") {
           await channel.track({
             id: user.id,
-            name: user.name,
-            role: user.role,
+            name: user.name || user.full_name || "Admin",
+            role: user.role || "Admin",
             onlineAt: new Date().toISOString(),
           });
         }
@@ -107,7 +108,7 @@ const LiveStreamSettings = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id, user?.name, user?.role]);
 
   // ─── Local state ───
   const [form, setForm] = useState({
@@ -128,6 +129,21 @@ const LiveStreamSettings = () => {
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error
   const [copied, setCopied] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+
+  // Escape key and body scroll lock for stop confirmation modal
+  useEffect(() => {
+    if (!showStopConfirm) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setShowStopConfirm(false);
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showStopConfirm]);
 
   // Metadata autograb values
   const [fetchedTitle, setFetchedTitle] = useState("Live Broadcast");
@@ -520,14 +536,13 @@ const LiveStreamSettings = () => {
                   )}
                 </div>
 
-                <div className="grid w-full grid-cols-3 h-14 bg-[var(--admin-input-bg)] border border-[var(--admin-border)] p-1.5 rounded-2xl shadow-inner gap-1">
+                <div className="grid w-full grid-cols-2 h-14 bg-[var(--admin-input-bg)] border border-[var(--admin-border)] p-1.5 rounded-2xl shadow-inner gap-1">
                   {[
                     { id: "youtube", label: "YouTube", Icon: Youtube },
                     { id: "facebook", label: "Facebook", Icon: FacebookIcon },
-                    { id: "custom", label: "OBS/vMix", Icon: Radio },
                   ].map(({ id, label, Icon }) => {
                     const isActive = form.platform === id;
-                    const isDisabled = form.isLive || id === "custom";
+                    const isDisabled = form.isLive;
                     return (
                       <button
                         key={id}
@@ -808,36 +823,45 @@ const LiveStreamSettings = () => {
       </div>
 
       {/* ═══ Stop Stream Modal ═══ */}
-      {showStopConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-theme-card border border-theme rounded-2xl p-6 max-w-sm w-full space-y-5 shadow-2xl">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-red-600/10 rounded-2xl border border-red-600/20 shrink-0">
-                <AlertTriangle size={20} className="text-red-400" />
+      {showStopConfirm &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[240] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto cursor-pointer"
+            onClick={() => setShowStopConfirm(false)}>
+            <div
+              className="bg-theme-card border border-theme rounded-2xl p-6 max-w-sm w-full space-y-5 shadow-2xl my-auto cursor-default"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-red-600/10 rounded-2xl border border-red-600/20 shrink-0">
+                  <AlertTriangle size={20} className="text-red-400" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-bold">Stop Live Stream?</h3>
+                  <p className="text-xs opacity-50 leading-relaxed">
+                    This will immediately remove the live player from the public
+                    website.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-sm font-bold">Stop Live Stream?</h3>
-                <p className="text-xs opacity-50 leading-relaxed">
-                  This will immediately remove the live player from the public
-                  website.
-                </p>
+              <div className="flex gap-3 justify-end pt-2 border-t border-theme">
+                <button
+                  type="button"
+                  onClick={() => setShowStopConfirm(false)}
+                  className="px-5 py-2.5 rounded-2xl bg-[var(--admin-input-bg)] border border-theme text-xs font-bold hover:bg-white/[0.08] transition-colors">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmStopStream}
+                  className="px-5 py-2.5 rounded-2xl bg-red-600 text-white text-xs font-bold hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition-all">
+                  End Stream
+                </button>
               </div>
             </div>
-            <div className="flex gap-3 justify-end pt-2 border-t border-theme">
-              <button
-                onClick={() => setShowStopConfirm(false)}
-                className="px-5 py-2.5 rounded-2xl bg-[var(--admin-input-bg)] border border-theme text-xs font-bold hover:bg-white/[0.08] transition-colors">
-                Cancel
-              </button>
-              <button
-                onClick={confirmStopStream}
-                className="px-5 py-2.5 rounded-2xl bg-red-600 text-white text-xs font-bold hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition-all">
-                End Stream
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bug,
@@ -223,17 +224,37 @@ const ReplyModal = ({ feedback, onClose, onSaved }) => {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+  // Escape key close
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  // Body scroll lock
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[240] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm cursor-pointer" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.97, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 8 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="relative w-full max-w-lg bg-[var(--admin-card-bg)]   borderborder-white/[0.06]  rounded-2xl shadow-2xl overflow-hidden z-10 will-change-transform"
+        className="relative w-full max-w-lg bg-[var(--admin-card-bg)] border border-white/[0.06] rounded-2xl shadow-2xl overflow-hidden z-10 will-change-transform my-auto max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] shrink-0">
           <div className="flex items-center gap-2">
             <MessageSquare size={13} className="text-[var(--accent)]" />
             <h3 className="text-[13px] font-semibold text-white">
@@ -248,8 +269,8 @@ const ReplyModal = ({ feedback, onClose, onSaved }) => {
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
-          <div className="p-3 bg-white/[0.02] border border-white/[0.06]  rounded-2xl text-xs">
+        <div className="p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+          <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-2xl text-xs">
             <p className="font-semibold text-white/80">{feedback.title}</p>
             <p className="text-white/40 mt-1 line-clamp-2 leading-relaxed">
               {feedback.description}
@@ -263,7 +284,7 @@ const ReplyModal = ({ feedback, onClose, onSaved }) => {
             rows={3}
             maxLength={2000}
             disabled={saving}
-            className={`w-full bg-white/[0.03] borderborder-white/[0.06]  rounded-2xl p-3 text-xs text-white placeholder-white/20 focus:outline-none focus:border-theme-accent/50 resize-none ${
+            className={`w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl p-3 text-xs text-white placeholder-white/20 focus:outline-none focus:border-theme-accent/50 resize-none ${
               saving ? "opacity-50 cursor-not-allowed" : ""
             }`}
           />
@@ -287,7 +308,8 @@ const ReplyModal = ({ feedback, onClose, onSaved }) => {
           </div>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

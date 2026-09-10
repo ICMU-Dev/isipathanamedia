@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Outlet, Link, useParams, useLocation } from "react-router-dom";
+import { Outlet, Link, useParams, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationProvider } from "../../context/NotificationContext";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
@@ -23,30 +23,10 @@ const SuperAdminLayout = () => {
   }, [location.pathname]);
 
   if (!isAuthorized) {
-    // Determine where to send them back based on their actual role
+    // Auto-redirect unauthorized clearance users (e.g. Writers or standard Admins)
+    // to their authorized dashboard zone rather than stopping on the Hub
     const returnPath = getDefaultDashboardPath(role, adminPath);
-
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-ambient text-center px-4">
-        <ShieldAlert
-          size={64}
-          className="text-red-600/50 mb-6 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse"
-        />
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase mb-2">
-          Unauthorized Clearance
-        </h2>
-        <p className="text-white/70 text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] mb-8 max-w-md">
-          Target destination requires Super Administrator or Dual Operator privileges. Your
-          current role [{role || "unknown"}] is insufficient.
-        </p>
-        <Link
-          to={returnPath}
-          className="flex items-center gap-3 px-6 py-4 bg-white/10 hover:bg-white text-white hover:text-dark rounded-2xl transition-all duration-300 text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 shadow-xl">
-          <ArrowLeft size={16} />
-          Return to Authorized Zone
-        </Link>
-      </div>
-    );
+    return <Navigate to={returnPath} replace />;
   }
 
   return (

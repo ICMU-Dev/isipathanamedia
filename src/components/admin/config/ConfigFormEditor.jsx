@@ -4,10 +4,7 @@ import {
   PhoneCall,
   Users,
   Trash2,
-  MoveUp,
-  MoveDown,
   ScrollText,
-  Layers,
   ExternalLink,
   Plus,
   SearchX,
@@ -128,22 +125,10 @@ const ConfigFormEditor = ({
     });
   };
 
-  // Section Sequence Handlers
-  const moveSection = (index, direction) => {
-    const sections = [...(safeConfig.sectionOrder || [])];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= sections.length) return;
-    const temp = sections[index];
-    sections[index] = sections[targetIndex];
-    sections[targetIndex] = temp;
-    onChange({ ...safeConfig, sectionOrder: sections });
-  };
-
   // Gather searchable labels
   const officerLabels = (safeConfig.contactDetails?.leadership || []).flatMap(
     (m) => [m.name, m.role, m.phone, m.whatsapp],
   );
-  const sectionLabels = safeConfig.sectionOrder || [];
 
   const showSocial = matchesSearch("social", [
     "facebook",
@@ -168,16 +153,7 @@ const ConfigFormEditor = ({
     ...officerLabels,
   ]);
 
-  const showSections = matchesSearch("sections", [
-    "layout",
-    "order",
-    "sequence",
-    "homepage",
-    ...sectionLabels,
-  ]);
-  const anySectionVisible =
-    (parentTab === "general" && (showSocial || showContact)) ||
-    (parentTab === "content" && showSections);
+  const anySectionVisible = parentTab === "general" && (showSocial || showContact);
 
   return (
     <div className="space-y-2 animate-fade-in">
@@ -440,59 +416,6 @@ const ConfigFormEditor = ({
                     ),
                   )}
                 </div>
-              </div>
-            </section>
-          )}        {/* 4. HOMEPAGE SECTION SEQUENCE */}
-          {parentTab === "content" && showSections && (
-            <section className="py-6 border-b border-white/[0.06]  last:border-0 space-y-6">
-              <div className="flex items-center gap-2.5 pb-2">
-                <Layers size={16} className="text-white/40" />
-                <div>
-                  <h2 className="text-[14px] font-bold text-white tracking-wide">
-                    Homepage Layout Sequence
-                  </h2>
-                  <p className="text-[11px] text-white/40 mt-0.5">
-                    Reorder top-to-bottom section arrangement
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(safeConfig.sectionOrder || []).map((sectionName, idx) => (
-                  <div
-                    key={sectionName}
-                    className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06]  flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <span className="w-5 h-5 rounded bg-black/40 text-white/40 font-mono text-[10px] flex items-center justify-center border border-white/[0.06] ">
-                        {idx + 1}
-                      </span>
-                      <span className="text-[12px] font-bold text-white/80 capitalize tracking-wide">
-                        {sectionName}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => moveSection(idx, -1)}
-                        className="p-1 text-white/30 hover:text-white disabled:opacity-20 transition-colors"
-                        title="Move Up">
-                        <MoveUp size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          idx === (safeConfig.sectionOrder?.length || 1) - 1
-                        }
-                        onClick={() => moveSection(idx, 1)}
-                        className="p-1 text-white/30 hover:text-white disabled:opacity-20 transition-colors"
-                        title="Move Down">
-                        <MoveDown size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             </section>
           )}

@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {  AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { useData } from "../../context/DataContext";
@@ -13,6 +15,8 @@ import PWAInstallCard from "../../components/admin/PWAInstallCard";
 import AppearanceTab from "./settings/AppearanceTab";
 import AboutTab from "./settings/AboutTab";
 import ConfigTab from "./settings/ConfigTab";
+import ReleaseManagerTab from "./settings/ReleaseManagerTab";
+import { isLocalhost, isAuthorizedDeveloper } from "../../utils/releaseManager";
 import {
   Tabs,
   TabsList,
@@ -42,6 +46,7 @@ import {
   Globe,
   Zap,
   ShieldCheck,
+  Rocket,
 } from "lucide-react";
 import Loader from "../../components/ui/Loader";
 
@@ -62,6 +67,37 @@ const urlB64ToUint8Array = (base64String) => {
   return outputArray;
 };
 
+const allSettingsTabs = [
+  {
+    id: "appearance",
+    label: "General Settings",
+    desc: "Customize the admin interface",
+    icon: <Palette size={16} />,
+    roles: ["writer", "admin", "super_admin"],
+  },
+  {
+    id: "general",
+    label: "Website Settings",
+    desc: "Update core metadata and links",
+    icon: <Share2 size={16} />,
+    roles: ["super_admin"],
+  },
+  {
+    id: "feedbacks",
+    label: "Feedbacks",
+    desc: "Review submitted feedback & bug reports",
+    icon: <MessageSquarePlus size={16} />,
+    roles: ["admin", "super_admin"],
+  },
+  {
+    id: "about",
+    label: "About",
+    desc: "App info & credits",
+    icon: <Info size={16} />,
+    roles: ["writer", "admin", "super_admin"],
+  },
+];
+
 const Settings = () => {
   const { siteConfig, updateSiteConfig, fetchData } = useData();
   const { themeId, setTheme, themes } = useTheme();
@@ -73,8 +109,43 @@ const Settings = () => {
   const role = user?.role;
   const isSuper = isSuperAdmin(role);
   const isAdm = isAdmin(role);
+  const normalizedRole = isSuper
+    ? "super_admin"
+    : isAdm
+      ? "admin"
+      : "writer";
 
-  const [activeTab, setActiveTab] = useState("appearance");
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const canManageReleases = useMemo(() => {
+    return isLocalhost() && isAuthorizedDeveloper(user);
+  }, [user]);
+
+  const settingsTabs = useMemo(() => {
+    const tabs = allSettingsTabs.filter((tab) =>
+      tab.roles.includes(normalizedRole),
+    );
+
+    if (canManageReleases) {
+      tabs.push({
+        id: "releases",
+        label: "Releases",
+        desc: "Localhost release & changelog manager",
+        icon: <Rocket size={16} />,
+        roles: ["writer", "admin", "super_admin"],
+      });
+    }
+
+    return tabs;
+  }, [normalizedRole, canManageReleases]);
+
+  // Hash-based tab routing
+  const rawHash = location.hash?.replace("#", "");
+  const activeTab = settingsTabs.some((t) => t.id === rawHash)
+    ? rawHash
+    : "appearance";
+  const setActiveTab = (tab) => navigate({ hash: tab }, { replace: true });
   const [configState, setConfigState] = useState(siteConfig || {});
   const [rawJsonText, setRawJsonText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,15 +155,24 @@ const Settings = () => {
   const [toastMessage, setToastMessage] = useState(null);
   const [jsonError, setJsonError] = useState(null);
 
-  // Clear feedback notification dots when viewing the feedbacks tab
-  useEffect(() => {
-    if (activeTab === "feedbacks" && unreadFeedbacks > 0) {
-      markAllFeedbacksAsRead();
-    }
-  }, [activeTab, unreadFeedbacks, markAllFeedbacksAsRead]);
 
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showJsonModal, setShowJsonModal] = useState(false);
+
+  // Escape key and body scroll lock for JSON modal
+  useEffect(() => {
+    if (!showJsonModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setShowJsonModal(false);
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showJsonModal]);
 
   const [feedbackEnabled, setFeedbackEnabled] = useState(() => {
     try {
@@ -361,16 +441,6 @@ const Settings = () => {
           youtube: "https://youtube.com",
           twitter: "https://twitter.com",
         },
-        sectionOrder: [
-          "home",
-          "partnerLogos",
-          "about",
-          "news",
-          "services",
-          "team",
-          "events",
-          "contact",
-        ],
         contactDetails: {
           address: "Isipathana College, Colombo 05, Sri Lanka",
           email: "icmediaunit@gmail.com",
@@ -477,48 +547,6 @@ const Settings = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const allSettingsTabs = [
-    {
-      id: "appearance",
-      label: "General Settings",
-      desc: "Customize the admin interface",
-      icon: <Palette size={16} />,
-      roles: ["writer", "admin", "super_admin"],
-    },
-    {
-      id: "general",
-      label: "Website Settings",
-      desc: "Update core metadata and links",
-      icon: <Share2 size={16} />,
-      roles: ["super_admin"],
-    },
-    {
-      id: "feedbacks",
-      label: "Feedbacks",
-      desc: "Review submitted feedback & bug reports",
-      icon: <MessageSquarePlus size={16} />,
-      roles: ["admin", "super_admin"],
-    },
-    {
-      id: "about",
-      label: "About",
-      desc: "App info & credits",
-      icon: <Info size={16} />,
-      roles: ["writer", "admin", "super_admin"],
-    },
-  ];
-
-  // helper to resolve normalizedRole for tab filtering
-  const normalizedRole = isSuper
-    ? "super_admin"
-    : isAdm
-      ? "admin"
-      : "writer";
-
-  const settingsTabs = allSettingsTabs.filter((tab) =>
-    tab.roles.includes(normalizedRole),
-  );
-
   // Divide themes into Skins and Colors for the new UI
   const themeValues = Object.values(themes);
   const themeSkins = themeValues.slice(0, 3); // Top 3 as "Skins"
@@ -527,7 +555,10 @@ const Settings = () => {
   const hasChanges = JSON.stringify(siteConfig) !== JSON.stringify(configState);
 
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto pb-24 relative min-h-[calc(100vh-80px)] px-4 sm:px-6 lg:px-8">
+    <div
+      className={`animate-fade-in max-w-4xl mx-auto relative px-4 sm:px-6 lg:px-8 ${
+        activeTab === "about" ? "pb-4 min-h-0" : "pb-24 min-h-[calc(100vh-80px)]"
+      }`}>
       {/* Dynamic Island Toast */}
       <div className="fixed bottom-24 left-0 right-0 z-[9999] flex justify-center pointer-events-none">
         <AnimatePresence>
@@ -771,50 +802,53 @@ const Settings = () => {
               />
             </TabsContent>
 
-            {/* TAB: CONTENT */}
-            <TabsContent value="content">
-              <ConfigTab
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                configState={configState}
-                handleFormChange={handleFormChange}
-                activeTab={activeTab}
-              />
-            </TabsContent>
+            {/* TAB: RELEASES (Localhost Devs Only) */}
+            {canManageReleases && (
+              <TabsContent value="releases">
+                <ReleaseManagerTab />
+              </TabsContent>
+            )}
           </div>
         </Tabs>
 
         {/* ── JSON Modal ── */}
-        {showJsonModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fade-in overflow-y-auto">
-            <div className="admin-card border border-[var(--admin-border)] rounded-2xl w-full max-w-3xl max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl my-auto">
-              <div className="px-6 py-4 border-b border-[var(--admin-border)] flex items-center justify-between shrink-0 bg-[var(--admin-input-bg)]">
-                <div className="flex items-center gap-3">
-                  <Code2 size={16} className="text-[var(--accent)]" />
-                  <h3 className="text-sm font-bold text-white">
-                    Raw JSON Configuration
-                  </h3>
+        {showJsonModal &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[240] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fade-in overflow-y-auto cursor-pointer"
+              onClick={() => setShowJsonModal(false)}>
+              <div
+                className="admin-card border border-[var(--admin-border)] rounded-2xl w-full max-w-3xl max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl my-auto cursor-default"
+                onClick={(e) => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b border-[var(--admin-border)] flex items-center justify-between shrink-0 bg-[var(--admin-input-bg)]">
+                  <div className="flex items-center gap-3">
+                    <Code2 size={16} className="text-[var(--accent)]" />
+                    <h3 className="text-sm font-bold text-white">
+                      Raw JSON Configuration
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowJsonModal(false)}
+                    className="p-1.5 rounded-2xl text-[var(--admin-text-secondary)] hover:text-white hover:bg-[var(--admin-border)] transition-colors">
+                    <X size={18} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowJsonModal(false)}
-                  className="p-1.5 rounded-2xl text-[var(--admin-text-secondary)] hover:text-white hover:bg-[var(--admin-border)] transition-colors">
-                  <X size={18} />
-                </button>
-              </div>
 
-              <div className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto">
-                <ConfigJsonEditor
-                  rawJsonText={rawJsonText}
-                  onChangeRawText={handleRawTextChange}
-                  jsonError={jsonError}
-                  onPrettify={handlePrettify}
-                  onResetDefault={handleResetDefault}
-                />
+                <div className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                  <ConfigJsonEditor
+                    rawJsonText={rawJsonText}
+                    onChangeRawText={handleRawTextChange}
+                    jsonError={jsonError}
+                    onPrettify={handlePrettify}
+                    onResetDefault={handleResetDefault}
+                  />
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body
+          )}
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { MorphingModal } from "../../../components/motion/morphing-modal";
 import { getRoleLabel } from "../../../utils/roles";
+import { UserAvatar } from "../../../components/ui/avatar";
 
 export default function UserActionsModal({
   user,
@@ -29,17 +30,13 @@ export default function UserActionsModal({
       {/* Header with full email & identity credentials */}
       <div className="p-5 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.02]">
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-950 border border-white/10 flex items-center justify-center font-bold text-white relative overflow-hidden shrink-0 shadow-md">
-            {user.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt={user.full_name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span>{user.full_name?.charAt(0)}</span>
-            )}
-          </div>
+          <UserAvatar
+            user={user}
+            size="lg"
+            shape="rounded"
+            className="w-12 h-12 rounded-2xl bg-zinc-950 border border-white/10 shrink-0 shadow-md"
+            fallbackClassName="font-bold text-white"
+          />
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-white tracking-tight truncate">
               {user.full_name}

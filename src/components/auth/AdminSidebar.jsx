@@ -13,6 +13,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -20,6 +21,8 @@ import { useData } from "../../context/DataContext";
 import { useNotification } from "../../context/NotificationContext";
 import MainLogos from "../../assets/main-logos.png";
 import ActiveAdmins from "../layout/ActiveAdmins";
+import NotificationDropdown from "../layout/NotificationDropdown";
+import { UserAvatar } from "../ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   isAdmin,
@@ -60,9 +63,10 @@ const AdminSidebar = ({
   const showAttentionBadge = isAdm && pendingCount > 0;
 
   const unreadFeedbacks =
-    notifications?.filter((n) => n.isFeedback && !n.read).length || 0;
+    notifications?.filter((n) => (n.isFeedback || n.category === "feedback") && !n.read).length || 0;
   const unreadMessages =
-    notifications?.filter((n) => !n.isFeedback && !n.read).length || 0;
+    notifications?.filter((n) => (n.isInbox || n.category === "inbox") && !n.read).length || 0;
+
 
   const showSettingsBadge = isAdm && unreadFeedbacks > 0;
   const showMessagesBadge = isAdm && unreadMessages > 0;
@@ -88,7 +92,7 @@ const AdminSidebar = ({
     },
     {
       name: "Team",
-      path: `${basePath}/dashboard/users`,
+      path: `${basePath}/dashboard/team`,
       icon: <Users size={18} />,
       roles: ["admin", "super_admin"],
     },
@@ -199,7 +203,7 @@ const AdminSidebar = ({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="hidden lg:flex items-center justify-center p-1.5 rounded-2xl text-theme-primary opacity-25 hover:text-theme-primary hover:bg-white/[0.05] group-hover:opacity-100 transition-all duration-200"
+              className="hidden lg:flex items-center justify-center p-1.5 rounded-2xl text-theme-primary opacity-25 hover:text-theme-primary hover:bg-white/[0.05] group-hover:opacity-100 transition-all duration-200 cursor-pointer"
               title="Collapse">
               <PanelLeftClose size={16} />
             </button>
@@ -360,8 +364,13 @@ const AdminSidebar = ({
         </nav>
       </div>
 
+      {/* Notifications & Activity */}
+      <div className="px-4 mb-2">
+        <NotificationDropdown isCollapsed={collapsed} />
+      </div>
+
       {/* Active Admins */}
-      <div className="px-4 mt-2 mb-2">
+      <div className="px-4 mb-2">
         <ActiveAdmins isCollapsed={collapsed} />
       </div>
 
@@ -382,21 +391,12 @@ const AdminSidebar = ({
                 transition={{ duration: 0.15 }}>
                 {/* User Info */}
                 <div className="flex items-center gap-3 px-2 py-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-[11px] font-semibold text-theme-primary opacity-70 shrink-0 overflow-hidden border border-white/5 relative">
-                    <span className="absolute flex items-center justify-center w-full h-full">
-                      {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
-                    </span>
-                    {user?.avatarUrl && (
-                      <img
-                        src={user.avatarUrl}
-                        alt={user.name || "User Avatar"}
-                        className="w-full h-full object-cover relative z-10"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    )}
-                  </div>
+                  <UserAvatar
+                    user={user}
+                    size="default"
+                    className="bg-white/[0.08] border border-white/5 shrink-0"
+                    fallbackClassName="text-[11px] font-semibold text-theme-primary opacity-70"
+                  />
                   <div className="min-w-0">
                     <p className="text-[13px] font-medium text-theme-primary opacity-80 truncate">
                       {user?.name || "Administrator"}

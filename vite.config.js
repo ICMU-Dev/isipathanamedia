@@ -13,12 +13,146 @@ try {
   console.warn("Could not retrieve git commit hash");
 }
 
-let appVersion = "1.0.0";
+let appVersion = "2.0.0";
 try {
   const pkg = JSON.parse(fs.readFileSync("./package.json", "utf-8"));
-  appVersion = pkg.version || "1.0.0";
+  appVersion = pkg.version || "2.0.0";
 } catch (e) {
   console.warn("Could not read package.json version");
+}
+
+// ── Localhost Dev-Only Release Manager Plugin ─────────────────────────────
+function devReleasePlugin() {
+  return {
+    name: "dev-release-api",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use("/__api/dev-release", async (req, res) => {
+        const sendJson = (status, data) => {
+          res.statusCode = status;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(data));
+        };
+
+        const rootDir = process.cwd();
+        const pkgPath = path.resolve(rootDir, "package.json");
+        const changelogJsonPath = path.resolve(rootDir, "src/data/changelogs.json");
+        const changelogMdPath = path.resolve(rootDir, "CHANGELOG.md");
+
+        const readJson = (filePath, fallback = {}) => {
+          try {
+            return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+          } catch {
+            return fallback;
+          }
+        };
+
+        const writeJson = (filePath, data) => {
+          fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+        };
+
+        const renderMarkdown = (releases) => {
+          let md = `# Changelog\n\nAll notable changes to the ICMU Web Platform will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n## [Unreleased]\n\n`;
+          for (const rel of releases) {
+            const v = rel.version || rel.title;
+            const dateStr = rel.isoDate || rel.date || new Date().toISOString().split("T")[0];
+            md += `## [${v}] - ${dateStr}\n\n`;
+            if (rel.desc) {
+              md += `${rel.desc}\n\n`;
+            }
+            if (Array.isArray(rel.steps) && rel.steps.length > 0) {
+              md += `### Highlights\n`;
+              for (const step of rel.steps) {
+                const title = typeof step === "string" ? step : step.t;
+                const desc = typeof step === "string" ? "" : step.d;
+                if (desc) {
+                  md += `- **${title}**: ${desc}\n`;
+                } else {
+                  md += `- ${title}\n`;
+                }
+              }
+              md += `\n`;
+            }
+          }
+          return md;
+        };
+
+        if (req.method === "GET") {
+          const pkg = readJson(pkgPath, { version: "2.0.0" });
+          const releases = readJson(changelogJsonPath, []);
+          let markdown = "";
+          try {
+            markdown = fs.readFileSync(changelogMdPath, "utf-8");
+          } catch {}
+          return sendJson(200, {
+            success: true,
+            version: pkg.version || "2.0.0",
+            releases,
+            changelogMarkdown: markdown,
+          });
+        }
+
+        if (req.method === "POST" || req.method === "DELETE") {
+          let body = "";
+          req.on("data", (chunk) => { body += chunk; });
+          req.on("end", () => {
+            try {
+              const payload = JSON.parse(body || "{}");
+              const pkg = readJson(pkgPath, { version: "2.0.0" });
+              let releases = readJson(changelogJsonPath, []);
+
+              if (req.method === "POST") {
+                const newVersion = payload.version ? payload.version.trim().replace(/^v/i, "") : pkg.version;
+                if (!newVersion) return sendJson(400, { success: false, error: "Version is required" });
+
+                const newRelease = {
+                  id: "v" + newVersion.replace(/\./g, "-"),
+                  version: newVersion,
+                  title: payload.title || `Release ${newVersion}`,
+                  subtitle: payload.subtitle || "System Update",
+                  badge: payload.badge || "FEATURE RELEASE",
+                  desc: payload.desc || "",
+                  date: payload.date || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                  isoDate: new Date().toISOString().split("T")[0],
+                  isMajor: Boolean(payload.isMajor),
+                  steps: Array.isArray(payload.steps) ? payload.steps : [],
+                };
+
+                releases = [newRelease, ...releases.filter((r) => r.version !== newVersion)];
+                pkg.version = newVersion;
+
+                writeJson(pkgPath, pkg);
+                writeJson(changelogJsonPath, releases);
+                fs.writeFileSync(changelogMdPath, renderMarkdown(releases), "utf-8");
+
+                return sendJson(200, { success: true, version: newVersion, releases });
+              }
+
+              if (req.method === "DELETE") {
+                const targetVersion = payload.version ? payload.version.trim().replace(/^v/i, "") : null;
+                if (!targetVersion) return sendJson(400, { success: false, error: "Target version is required" });
+
+                releases = releases.filter((r) => r.version !== targetVersion);
+                const newVersion = releases[0]?.version || "2.0.0";
+                pkg.version = newVersion;
+
+                writeJson(pkgPath, pkg);
+                writeJson(changelogJsonPath, releases);
+                fs.writeFileSync(changelogMdPath, renderMarkdown(releases), "utf-8");
+
+                return sendJson(200, { success: true, version: newVersion, releases });
+              }
+            } catch (err) {
+              return sendJson(500, { success: false, error: err.message });
+            }
+          });
+          return;
+        }
+
+        sendJson(405, { success: false, error: "Method not allowed" });
+      });
+    },
+  };
 }
 
 // https://vite.dev/config/
@@ -27,7 +161,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(appVersion),
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
-  plugins: [react()],
+  plugins: [react(), devReleasePlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

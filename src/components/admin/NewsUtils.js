@@ -121,24 +121,32 @@ export const resolveAuthorInfo = (item, webUsers = []) => {
     item.author === "Isipathana College Media Unit" ||
     item.author === "isipathanamedia";
 
-  const submitterUser = webUsers?.find(
-    (u) =>
-      u.id === item.submitted_by ||
-      u.email === item.submitted_by ||
-      u.index_number === item.submitted_by ||
-      u.indexNumber === item.submitted_by ||
-      u.full_name === item.submitted_by ||
-      u.name === item.submitted_by,
-  );
+  const cleanSubmitted = (item.submitted_by || "").toString().trim().toLowerCase();
+  const cleanAuthor = (item.author || "").toString().trim().toLowerCase();
+
+  const submitterUser = webUsers?.find((u) => {
+    if (!u) return false;
+    return (
+      (u.id && u.id.toString().toLowerCase() === cleanSubmitted) ||
+      (u.email && u.email.toLowerCase() === cleanSubmitted) ||
+      (u.index_number && u.index_number.toString().toLowerCase() === cleanSubmitted) ||
+      (u.indexNumber && u.indexNumber.toString().toLowerCase() === cleanSubmitted) ||
+      (u.full_name && u.full_name.toLowerCase() === cleanSubmitted) ||
+      (u.name && u.name.toLowerCase() === cleanSubmitted)
+    );
+  });
 
   const authorUser = !isICMU
-    ? webUsers?.find(
-        (u) =>
-          u.full_name?.toLowerCase() === item.author?.toLowerCase() ||
-          u.name?.toLowerCase() === item.author?.toLowerCase() ||
-          u.id === item.author ||
-          u.email === item.author,
-      )
+    ? webUsers?.find((u) => {
+        if (!u) return false;
+        return (
+          (u.full_name && u.full_name.toLowerCase() === cleanAuthor) ||
+          (u.name && u.name.toLowerCase() === cleanAuthor) ||
+          (u.id && u.id.toString().toLowerCase() === cleanAuthor) ||
+          (u.email && u.email.toLowerCase() === cleanAuthor) ||
+          (u.index_number && u.index_number.toString().toLowerCase() === cleanAuthor)
+        );
+      })
     : null;
 
   const authorName = isICMU
@@ -150,9 +158,29 @@ export const resolveAuthorInfo = (item, webUsers = []) => {
     submitterUser?.name ||
     (item.submitted_by && item.submitted_by !== "Admin" ? item.submitted_by : null);
 
+  const extractUserAvatar = (user) => {
+    if (!user) return null;
+    return (
+      user.avatar_url ||
+      user.avatarUrl ||
+      user.profile ||
+      user.profile_picture ||
+      user.picture ||
+      user.user_metadata?.avatar_url ||
+      user.user_metadata?.picture ||
+      null
+    );
+  };
+
+  const authorAvatar = extractUserAvatar(authorUser);
+  const submitterAvatar = extractUserAvatar(submitterUser);
+
+  // For updates, the poster is the submitter so prioritize submitter avatar
+  // For articles, prioritize custom author avatar, fallback to submitter avatar
   const avatarUrl =
-    authorUser?.avatar_url ||
-    (!isICMU ? submitterUser?.avatar_url : null);
+    item.type === "update"
+      ? (submitterAvatar || authorAvatar)
+      : (authorAvatar || submitterAvatar);
 
   const initials = (authorName || "U")
     .split(" ")
@@ -166,6 +194,8 @@ export const resolveAuthorInfo = (item, webUsers = []) => {
     authorName,
     submitterName,
     avatarUrl,
+    authorAvatarUrl: authorAvatar,
+    submitterAvatarUrl: submitterAvatar,
     initials,
   };
 };

@@ -57,6 +57,20 @@ module.exports = {
         "admin-text": "var(--admin-text-primary, #fff)",
         "admin-muted": "var(--admin-text-secondary, #a1a1aa)",
         "theme-accent": "rgba(var(--accent-rgb, 75, 196, 51), <alpha-value>)",
+
+        // ─── Official Brand v2 Tokens ───
+        "brand-bg": "#010F0B",
+        "brand-card": "#011D17",
+        "brand-accent": "#178740",
+        "brand-accent-glow": "#1EB957",
+        "brand-text": "#D1FAE5",
+        "brand-muted": "#677E70",
+        "brand-muted-light": "#8FAEA0",
+        "brand-forest-deep": "#010F0B",
+        "brand-forest": "#011D17",
+        "brand-mint": "#D1FAE5",
+        "brand-butter": "#D1FAE5",
+        "brand-lime": "#1EB957",
       },
       fontFamily: {
         sans: ["Montserrat", "sans-serif"],

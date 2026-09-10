@@ -9,13 +9,26 @@ import React, {
 import { useAuth } from "./AuthContext";
 import { supabase } from "../lib/supabaseClient";
 import { toast } from "sonner";
-import { MessageCircle, AlertCircle, X } from "lucide-react";
+import {
+  MessageCircle,
+  AlertCircle,
+  Mail,
+  Bug,
+  Sparkles,
+  AlertTriangle,
+  X,
+  Radio,
+} from "lucide-react";
+import { isAdmin as checkIsAdmin, isSuperAdmin as checkIsSuperAdmin, isWriter as checkIsWriter } from "../utils/roles";
+import initialChangelogs from "../data/changelogs.json";
+
+const DEV_SYSTEM_NOTIFS_KEY = "icmu_dev_system_notifications";
 
 const NotificationContext = createContext();
 export const useNotification = () => useContext(NotificationContext);
 
-/** Plays a short, pleasant two-tone chime using the Web Audio API. No external file needed. */
-const playNotificationSound = () => {
+/** Plays a short, pleasant two-tone chime using the Web Audio API. No external audio file needed. */
+export const playNotificationSound = () => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const now = ctx.currentTime;
@@ -24,7 +37,7 @@ const playNotificationSound = () => {
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = "sine";
-    osc1.frequency.setValueAtTime(880, now);        // A5
+    osc1.frequency.setValueAtTime(880, now); // A5
     gain1.gain.setValueAtTime(0.15, now);
     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
     osc1.connect(gain1).connect(ctx.destination);
@@ -46,39 +59,34 @@ const playNotificationSound = () => {
     // Clean up after done
     setTimeout(() => ctx.close(), 500);
   } catch (e) {
-    // Silently fail — audio is a nice-to-have, not critical
+    // Silently fail — audio is optional/enhancement
   }
 };
 
-// LocalStorage Helper Constants & Safe Accessors
-const READ_FEEDBACK_KEY = "icmu_read_feedback_ids";
+// LocalStorage Keys for read state & dismissed state
+const READ_NOTIFS_KEY = "icmu_read_feedback_ids";
+const DISMISSED_NOTIFS_KEY = "icmu_dismissed_notification_ids";
 
-const getStoredReadIds = () => {
+const getStoredIds = (key) => {
   try {
-    const raw = localStorage.getItem(READ_FEEDBACK_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
   } catch (err) {
-    console.warn(
-      "[NotificationContext] Error reading feedback IDs from localStorage:",
-      err
-    );
+    console.warn(`[NotificationContext] Error reading ${key} from localStorage:`, err);
     return [];
   }
 };
 
-const saveStoredReadIds = (ids) => {
+const saveStoredIds = (key, ids) => {
   try {
-    const stringifiedIds = Array.from(new Set(ids.map((id) => String(id))));
-    // Cap to most recent 1000 to prevent localStorage QuotaExceededError memory leaks
-    const cappedIds = stringifiedIds.slice(-1000);
-    localStorage.setItem(READ_FEEDBACK_KEY, JSON.stringify(cappedIds));
+    const unique = Array.from(new Set(ids.map((id) => String(id))));
+    // Cap to most recent 1000 items to prevent storage bloat
+    const capped = unique.slice(-1000);
+    localStorage.setItem(key, JSON.stringify(capped));
   } catch (err) {
-    console.warn(
-      "[NotificationContext] Error saving feedback IDs to localStorage:",
-      err
-    );
+    console.warn(`[NotificationContext] Error saving ${key} to localStorage:`, err);
   }
 };
 
@@ -86,16 +94,17 @@ export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [permissionGranted, setPermissionGranted] = useState(false);
-  const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false);
-  const [feedbackError, setFeedbackError] = useState(null);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [notificationError, setNotificationError] = useState(null);
 
-  // Determine user role and admin status
-  const role = user?.role?.toLowerCase() || "";
-  const isSuperAdmin =
-    role === "super-admin" || role === "superadmin" || role === "super_admin";
-  const isAdmin = role === "admin" || isSuperAdmin;
+  // Clearance validation
+  const userRole = user?.role;
+  const isSuperAdmin = checkIsSuperAdmin(userRole);
+  const isAdmin = checkIsAdmin(userRole);
+  const isWriter = checkIsWriter(userRole);
+  const canReceiveNotifications = isAdmin || isWriter;
 
-  // 1. Request Browser Desktop Notification Permissions upon login
+  // 1. Request Browser Desktop Notification Permissions
   useEffect(() => {
     if (!user) return;
 
@@ -118,76 +127,289 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [user]);
 
-  // 2. Mount Database Fetching & Garbage Collection for Admin Users
-  const fetchFeedbacks = useCallback(async () => {
-    if (!user || !isAdmin || !supabase) {
+  // 2. Fetch Notifications from Supabase (Feedbacks + Messages + Articles)
+  const fetchNotifications = useCallback(async () => {
+    if (!user || !canReceiveNotifications || !supabase) {
       setNotifications([]);
       return;
     }
 
-    setIsLoadingFeedbacks(true);
-    setFeedbackError(null);
+    setIsLoadingNotifications(true);
+    setNotificationError(null);
 
     try {
-      const { data, error } = await supabase
-        .from("feedbacks")
-        .select("*, users(full_name)")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
+      const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
+      const unifiedItems = [];
 
-      if (error) throw error;
+      // 1. Fetch Admin Data (Feedbacks, Messages, Pending Articles)
+      if (isAdmin) {
+        const [feedbacksRes, messagesRes, pendingNewsRes] = await Promise.allSettled([
+          supabase
+            .from("feedbacks")
+            .select("*, users(full_name, avatar_url)")
+            .order("created_at", { ascending: false })
+            .limit(50),
+          supabase
+            .from("messages")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(50),
+          supabase
+            .from("news")
+            .select("id, title, author, status, needs_attention, review_notes, created_at, date, submitted_by")
+            .eq("status", "pending")
+            .order("created_at", { ascending: false })
+            .limit(50),
+        ]);
 
-      const dbFeedbacks = data || [];
-      const dbIdSet = new Set(dbFeedbacks.map((fb) => String(fb.id)));
+        // Process Feedbacks
+        if (feedbacksRes.status === "fulfilled" && !feedbacksRes.value.error) {
+          const dbFeedbacks = feedbacksRes.value.data || [];
+          for (const fb of dbFeedbacks) {
+            const strId = `fb-${fb.id}`;
+            if (dismissedIds.has(strId) || dismissedIds.has(String(fb.id))) continue;
 
-      const storedIds = getStoredReadIds();
-      const validReadSet = new Set(storedIds.map((id) => String(id)));
+            unifiedItems.push({
+              id: strId,
+              rawId: fb.id,
+              category: "feedback",
+              subType: fb.type || "other",
+              title: fb.title || "Feedback Report",
+              description: fb.description || "",
+              senderName: fb.users?.full_name || "System Admin",
+              senderAvatar: fb.users?.avatar_url || null,
+              senderEmail: null,
+              senderPhone: null,
+              status: fb.status || "open",
+              userId: fb.user_id || null,
+              createdAt: fb.created_at || new Date().toISOString(),
+              read: readIds.has(strId) || readIds.has(String(fb.id)),
+              isFeedback: true,
+              isInbox: false,
+            });
+          }
+        }
 
-      // Map DB feedbacks into context notifications state
-      const mappedFeedbacks = dbFeedbacks.map((fb) => ({
-        id: String(fb.id),
-        dbId: fb.id,
-        senderId: "system",
-        senderName: fb.users?.full_name || "System",
-        text: `New ${fb.type?.toUpperCase()} Feedback: ${fb.title}`,
-        title: fb.title,
-        description: fb.description,
-        type: fb.type,
-        status: fb.status,
-        userId: fb.user_id || null,
-        createdAt: fb.created_at || new Date().toISOString(),
-        read: validReadSet.has(String(fb.id)),
-        isFeedback: true,
-      }));
+        // Process Inbox Messages
+        if (messagesRes.status === "fulfilled" && !messagesRes.value.error) {
+          const dbMessages = messagesRes.value.data || [];
+          for (const msg of dbMessages) {
+            const strId = `msg-${msg.id}`;
+            if (dismissedIds.has(strId) || dismissedIds.has(String(msg.id))) continue;
+
+            unifiedItems.push({
+              id: strId,
+              rawId: msg.id,
+              category: "inbox",
+              subType: "contact",
+              title:
+                msg.subject ||
+                (msg.message
+                  ? msg.message.length > 50
+                    ? msg.message.slice(0, 50) + "…"
+                    : msg.message
+                  : `Inquiry from ${msg.name || "Visitor"}`),
+              description: msg.message || "",
+              senderName: msg.name || "Website Visitor",
+              senderAvatar: null,
+              senderEmail: msg.email || null,
+              senderPhone: msg.phone || null,
+              status: msg.status || "received",
+              userId: null,
+              createdAt: msg.created_at || new Date().toISOString(),
+              read: readIds.has(strId) || readIds.has(String(msg.id)),
+              isFeedback: false,
+              isInbox: true,
+            });
+          }
+        }
+
+        // Process Pending Articles for Admins
+        if (pendingNewsRes.status === "fulfilled" && !pendingNewsRes.value.error) {
+          const dbNews = pendingNewsRes.value.data || [];
+          for (const art of dbNews) {
+            const strId = `art-review-${art.id}`;
+            if (dismissedIds.has(strId) || dismissedIds.has(String(art.id))) continue;
+
+            unifiedItems.push({
+              id: strId,
+              rawId: art.id,
+              category: "article",
+              subType: "pending_review",
+              title: "Article Submitted for Review",
+              description: `"${art.title}" submitted by ${art.author || "Writer"} requires review.`,
+              senderName: art.author || "Newsroom Writer",
+              senderAvatar: null,
+              status: "pending",
+              targetUrl: `/dashboard/news?tab=pending`,
+              createdAt: art.created_at || art.date || new Date().toISOString(),
+              read: readIds.has(strId) || readIds.has(String(art.id)),
+              isArticle: true,
+            });
+          }
+        }
+      }
+
+      // 2. Fetch Writer-Specific Article Notifications
+      if (isWriter && user?.id) {
+        const { data: writerNews, error: writerError } = await supabase
+          .from("news")
+          .select("id, title, author, status, needs_attention, review_notes, created_at, date, submitted_by")
+          .eq("submitted_by", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (!writerError && writerNews) {
+          for (const art of writerNews) {
+            if (art.needs_attention) {
+              const strId = `art-attn-${art.id}`;
+              if (dismissedIds.has(strId) || dismissedIds.has(String(art.id))) continue;
+              unifiedItems.push({
+                id: strId,
+                rawId: art.id,
+                category: "article",
+                subType: "needs_attention",
+                title: `Needs Attention: "${art.title}"`,
+                description: art.review_notes || "Editor requested changes before this article can be approved.",
+                senderName: "Review Administrator",
+                senderAvatar: null,
+                status: "needs_attention",
+                targetUrl: `/dashboard/news?tab=pending`,
+                createdAt: art.created_at || art.date || new Date().toISOString(),
+                read: readIds.has(strId) || readIds.has(String(art.id)),
+                isArticle: true,
+              });
+            } else if (art.status === "published") {
+              const strId = `art-approved-${art.id}`;
+              if (dismissedIds.has(strId) || dismissedIds.has(String(art.id))) continue;
+              unifiedItems.push({
+                id: strId,
+                rawId: art.id,
+                category: "article",
+                subType: "approved",
+                title: `Article Published: "${art.title}"`,
+                description: "Your article has been reviewed, approved, and published.",
+                senderName: "Review Administrator",
+                senderAvatar: null,
+                status: "published",
+                targetUrl: `/news/${art.id}`,
+                createdAt: art.created_at || art.date || new Date().toISOString(),
+                read: readIds.has(strId) || readIds.has(String(art.id)),
+                isArticle: true,
+              });
+            } else if (art.status === "rejected") {
+              const strId = `art-rejected-${art.id}`;
+              if (dismissedIds.has(strId) || dismissedIds.has(String(art.id))) continue;
+              unifiedItems.push({
+                id: strId,
+                rawId: art.id,
+                category: "article",
+                subType: "rejected",
+                title: `Article Declined: "${art.title}"`,
+                description: art.review_notes || "This article was declined by an administrator.",
+                senderName: "Review Administrator",
+                senderAvatar: null,
+                status: "rejected",
+                targetUrl: `/dashboard/news?tab=pending`,
+                createdAt: art.created_at || art.date || new Date().toISOString(),
+                read: readIds.has(strId) || readIds.has(String(art.id)),
+                isArticle: true,
+              });
+            }
+          }
+        }
+      }
+
+      // 1. Convert base changelog releases into persistent system release notifications
+      const baseReleases = Array.isArray(initialChangelogs) ? initialChangelogs : [];
+      const changelogSystemNotifs = baseReleases.map((rel) => {
+        const id = `sys-rel-${rel.version || rel.id}`;
+        const isRead = readIds.has(id);
+        const dateIso = rel.isoDate || (rel.date ? new Date(rel.date).toISOString() : new Date().toISOString());
+        return {
+          id,
+          rawId: rel.version,
+          category: "system",
+          subType: "release",
+          badge: rel.badge || (rel.isMajor ? "MAJOR RELEASE" : "SYSTEM UPDATE"),
+          version: rel.version,
+          title: `Release v${rel.version}: ${rel.title}`,
+          description: rel.desc || rel.subtitle || "System release update",
+          senderName: "Platform Dev Release",
+          senderAvatar: null,
+          senderEmail: null,
+          senderPhone: null,
+          status: "released",
+          userId: null,
+          createdAt: dateIso,
+          read: isRead,
+          isFeedback: false,
+          isInbox: false,
+          isArticle: false,
+          steps: Array.isArray(rel.steps) ? rel.steps : [],
+          targetUrl: "/dashboard",
+        };
+      });
+
+      // 2. Load custom developer system announcements from localStorage
+      let localDevNotifs = [];
+      try {
+        const stored = JSON.parse(localStorage.getItem(DEV_SYSTEM_NOTIFS_KEY) || "[]");
+        if (Array.isArray(stored)) {
+          localDevNotifs = stored.map((item) => ({
+            ...item,
+            read: readIds.has(String(item.id)),
+          }));
+        }
+      } catch {}
+
+      const allSystemNotifs = [...localDevNotifs, ...changelogSystemNotifs].filter(
+        (n) => !dismissedIds.has(String(n.id))
+      );
+
+      const uniqueSystemMap = new Map();
+      allSystemNotifs.forEach((item) => {
+        if (!uniqueSystemMap.has(String(item.id))) {
+          uniqueSystemMap.set(String(item.id), item);
+        }
+      });
+      const validSystemNotifs = Array.from(uniqueSystemMap.values());
 
       setNotifications((prev) => {
-        const nonFeedbacks = prev.filter((n) => !n.isFeedback);
-        return [...mappedFeedbacks, ...nonFeedbacks];
+        const activeDynamicSystem = prev.filter(
+          (n) => n.category === "system" && !dismissedIds.has(String(n.id))
+        );
+        const mergedSystemMap = new Map();
+        validSystemNotifs.forEach((n) => mergedSystemMap.set(String(n.id), n));
+        activeDynamicSystem.forEach((n) => mergedSystemMap.set(String(n.id), n));
+
+        const systemNotifs = Array.from(mergedSystemMap.values());
+        const combined = [...systemNotifs, ...unifiedItems];
+        combined.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        return combined;
       });
     } catch (err) {
-      console.error(
-        "[NotificationContext] Error fetching feedbacks:",
-        err.message
-      );
-      setFeedbackError(err.message);
+      console.error("[NotificationContext] Error fetching notifications:", err.message);
+      setNotificationError(err.message);
     } finally {
-      setIsLoadingFeedbacks(false);
+      setIsLoadingNotifications(false);
     }
-  }, [user, isAdmin]);
+  }, [user?.id, isAdmin, isWriter, canReceiveNotifications]);
 
   useEffect(() => {
-    fetchFeedbacks();
-  }, [fetchFeedbacks]);
+    fetchNotifications();
+  }, [fetchNotifications]);
 
-  // 3. Realtime Postgres Changes Subscription for Feedback Inserts
+  // 3. Realtime Postgres Subscriptions for Feedbacks, Messages & News
   useEffect(() => {
     const currentUserId = user?.id;
-    if (!currentUserId || !isAdmin || !supabase) return;
+    if (!currentUserId || !canReceiveNotifications || !supabase || typeof supabase.channel !== "function") return;
 
-    let feedbackChannel = null;
-
-    feedbackChannel = supabase
-      .channel(`feedbacks_realtime_${currentUserId}`)
+    const channel = supabase
+      .channel(`admin_notifications_${currentUserId}`)
       .on(
         "postgres_changes",
         {
@@ -197,14 +419,20 @@ export const NotificationProvider = ({ children }) => {
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            setNotifications((prev) => prev.filter((n) => String(n.dbId) !== String(payload.old.id)));
+            const rawId = payload.old?.id;
+            setNotifications((prev) =>
+              prev.filter((n) => n.rawId !== rawId && n.id !== `fb-${rawId}`)
+            );
             return;
           }
 
           if (payload.eventType === "UPDATE") {
+            const updated = payload.new;
             setNotifications((prev) =>
               prev.map((n) =>
-                String(n.dbId) === String(payload.new.id) ? { ...n, status: payload.new.status } : n
+                n.rawId === updated.id || n.id === `fb-${updated.id}`
+                  ? { ...n, status: updated.status }
+                  : n
               )
             );
             return;
@@ -214,72 +442,92 @@ export const NotificationProvider = ({ children }) => {
             const rawFb = payload.new;
             if (!rawFb) return;
 
-            // Exclude self: if the user who submitted the feedback is the current user, ignore the toast.
+            // Ignore self-submitted feedback
             if (rawFb.user_id === currentUserId) return;
 
-            const stringId = String(rawFb.id);
-            const storedReadSet = new Set(
-              getStoredReadIds().map((id) => String(id))
-            );
+            const strId = `fb-${rawFb.id}`;
+            const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
+            if (dismissedIds.has(strId)) return;
 
-            const notifItem = {
-              id: stringId,
-              dbId: rawFb.id,
-              senderId: "system",
-              senderName: rawFb.user_id === currentUserId ? user?.name : "System",
-              text: `New ${rawFb.type?.toUpperCase()} Feedback: ${rawFb.title}`,
-              title: rawFb.title,
-              description: rawFb.description,
-              type: rawFb.type,
-              status: rawFb.status,
+            const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
+
+            const newItem = {
+              id: strId,
+              rawId: rawFb.id,
+              category: "feedback",
+              subType: rawFb.type || "other",
+              title: rawFb.title || "New Feedback",
+              description: rawFb.description || "",
+              senderName: "Admin User",
+              senderAvatar: null,
+              senderEmail: null,
+              senderPhone: null,
+              status: rawFb.status || "open",
               userId: rawFb.user_id || null,
               createdAt: rawFb.created_at || new Date().toISOString(),
-              read: storedReadSet.has(stringId),
+              read: readIds.has(strId),
               isFeedback: true,
+              isInbox: false,
             };
 
             setNotifications((prev) => {
-              if (prev.some((n) => String(n.id) === stringId)) return prev;
-              return [notifItem, ...prev];
+              if (prev.some((n) => n.id === strId)) return prev;
+              return [newItem, ...prev];
             });
+
+            // Audio Alert
+            playNotificationSound();
 
             const isBlocked = localStorage.getItem("icmu_notifications_blocked") === "true";
             if (!isBlocked) {
+              const subType = rawFb.type?.toLowerCase();
+              let icon = <AlertCircle size={18} className="text-theme-accent" />;
+              let badgeColor = "bg-theme-accent/20 text-theme-accent border-theme-accent/30";
+
+              if (subType === "bug") {
+                icon = <Bug size={18} className="text-red-400" />;
+                badgeColor = "bg-red-500/20 text-red-400 border-red-500/30";
+              } else if (subType === "known_issue") {
+                icon = <AlertTriangle size={18} className="text-amber-400" />;
+                badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+              } else if (subType === "feature" || subType === "feature_request") {
+                icon = <Sparkles size={18} className="text-purple-400" />;
+                badgeColor = "bg-purple-500/20 text-purple-400 border-purple-500/30";
+              }
+
               toast.custom(
                 (t) => (
                   <div
                     onClick={() => toast.dismiss(t)}
                     className="flex flex-row items-start gap-3 p-4 bg-[var(--admin-card-bg,#1c1c1e)] rounded-2xl shadow-2xl min-w-[320px] max-w-sm border border-[var(--admin-border,rgba(255,255,255,0.1))] font-sans relative cursor-pointer hover:brightness-110 transition-all">
                     <div className="relative shrink-0 mt-0.5">
-                      <img
-                        src="/favicon-96x96.png"
-                        alt="IC Logo"
-                        className="w-10 h-10 rounded-full object-cover bg-white p-2"
-                      />
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${badgeColor}`}>
+                        {icon}
+                      </div>
                       <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-red-600 border-2 border-[var(--admin-card-bg)] items-center justify-center">
-                          <AlertCircle size={10} className="text-white" />
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-accent opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-theme-accent border-2 border-[var(--admin-card-bg)] items-center justify-center shadow-[0_0_6px_rgba(var(--accent-rgb,75,196,51),0.8)]">
+                          <AlertCircle size={10} className="text-[var(--admin-bg,#000)]" />
                         </span>
                       </span>
                     </div>
-                    <div className="flex flex-col flex-1 gap-1 pr-4">
+                    <div className="flex flex-col flex-1 gap-1 pr-4 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-[14px] font-bold text-[var(--admin-text-primary)] tracking-tight">
-                          System Feedback
+                        <span className="text-[13px] font-bold text-[var(--admin-text-primary,#fff)] tracking-tight">
+                          New In-App Feedback
                         </span>
-                        <span className="text-[11px] text-[var(--admin-text-primary)] opacity-50 font-medium">
+                        <span className="text-[10px] text-[var(--admin-text-secondary,#a1a1aa)] opacity-70">
                           Just now
                         </span>
                       </div>
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[var(--admin-text-primary)] text-[var(--admin-card-bg)] w-max mb-1 mt-0.5">
-                        {rawFb.type}
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 w-max">
+                        {rawFb.type || "Feedback"}
                       </span>
-                      <span className="text-[13px] font-semibold text-[var(--admin-text-primary)] leading-tight">
+                      <span className="text-[12px] font-semibold text-[var(--admin-text-primary,#fff)] leading-tight truncate">
                         {rawFb.title}
                       </span>
                       {rawFb.description && (
-                        <span className="text-[12px] text-[var(--admin-text-primary)] opacity-70 line-clamp-2 leading-relaxed mt-1">
+                        <span className="text-[11px] text-[var(--admin-text-secondary,#a1a1aa)] line-clamp-2 leading-relaxed mt-0.5">
                           {rawFb.description}
                         </span>
                       )}
@@ -289,7 +537,7 @@ export const NotificationProvider = ({ children }) => {
                         e.stopPropagation();
                         toast.dismiss(t);
                       }}
-                      className="text-[var(--admin-text-primary)] opacity-30 hover:opacity-100 transition-opacity p-1 absolute top-3 right-3">
+                      className="text-[var(--admin-text-secondary,#a1a1aa)] opacity-40 hover:opacity-100 transition-opacity p-1 absolute top-3 right-3">
                       <X size={14} strokeWidth={2.5} />
                     </button>
                   </div>
@@ -300,30 +548,193 @@ export const NotificationProvider = ({ children }) => {
           }
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setFeedbackError(null);
-          fetchFeedbacks(); // Refetch to catch any events missed while disconnected
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setFeedbackError("Real-time connection lost. Reconnecting...");
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const rawId = payload.old?.id;
+            setNotifications((prev) =>
+              prev.filter((n) => n.rawId !== rawId && n.id !== `msg-${rawId}`)
+            );
+            return;
+          }
+
+          if (payload.eventType === "INSERT") {
+            const rawMsg = payload.new;
+            if (!rawMsg) return;
+
+            const strId = `msg-${rawMsg.id}`;
+            const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
+            if (dismissedIds.has(strId)) return;
+
+            const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
+
+            const newItem = {
+              id: strId,
+              rawId: rawMsg.id,
+              category: "inbox",
+              subType: "contact",
+              title:
+                rawMsg.subject ||
+                (rawMsg.message
+                  ? rawMsg.message.length > 50
+                    ? rawMsg.message.slice(0, 50) + "…"
+                    : rawMsg.message
+                  : `Inquiry from ${rawMsg.name || "Visitor"}`),
+              description: rawMsg.message || "",
+              senderName: rawMsg.name || "Website Visitor",
+              senderAvatar: null,
+              senderEmail: rawMsg.email || null,
+              senderPhone: rawMsg.phone || null,
+              status: rawMsg.status || "received",
+              userId: null,
+              createdAt: rawMsg.created_at || new Date().toISOString(),
+              read: readIds.has(strId),
+              isFeedback: false,
+              isInbox: true,
+            };
+
+            setNotifications((prev) => {
+              if (prev.some((n) => n.id === strId)) return prev;
+              return [newItem, ...prev];
+            });
+
+            // Audio Alert
+            playNotificationSound();
+
+            const isBlocked = localStorage.getItem("icmu_notifications_blocked") === "true";
+            if (!isBlocked) {
+              toast.custom(
+                (t) => (
+                  <div
+                    onClick={() => toast.dismiss(t)}
+                    className="flex flex-row items-start gap-3 p-4 bg-[var(--admin-card-bg,#1c1c1e)] rounded-2xl shadow-2xl min-w-[320px] max-w-sm border border-[var(--admin-border,rgba(255,255,255,0.1))] font-sans relative cursor-pointer hover:brightness-110 transition-all">
+                    <div className="relative shrink-0 mt-0.5">
+                      <div className="w-10 h-10 rounded-2xl bg-theme-accent/20 border border-theme-accent/30 flex items-center justify-center">
+                        <Mail size={18} className="text-theme-accent" />
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-accent opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-theme-accent border-2 border-[var(--admin-card-bg)] items-center justify-center shadow-[0_0_6px_rgba(var(--accent-rgb,75,196,51),0.8)]">
+                          <MessageCircle size={10} className="text-[var(--admin-bg,#000)]" />
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex flex-col flex-1 gap-1 pr-4 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] font-bold text-[var(--admin-text-primary,#fff)] tracking-tight">
+                          New Website Inquiry
+                        </span>
+                        <span className="text-[10px] text-[var(--admin-text-secondary,#a1a1aa)] opacity-70">
+                          Just now
+                        </span>
+                      </div>
+                      <span className="text-[12px] font-semibold text-theme-accent truncate">
+                        {rawMsg.name || "Visitor"} {rawMsg.email ? `(${rawMsg.email})` : ""}
+                      </span>
+                      <span className="text-[12px] font-medium text-[var(--admin-text-primary,#fff)] leading-tight truncate">
+                        {rawMsg.subject || (rawMsg.message ? (rawMsg.message.length > 50 ? rawMsg.message.slice(0, 50) + "…" : rawMsg.message) : "Public Contact Submission")}
+                      </span>
+                      {rawMsg.message && (
+                        <span className="text-[11px] text-[var(--admin-text-secondary,#a1a1aa)] line-clamp-2 leading-relaxed mt-0.5">
+                          {rawMsg.message}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast.dismiss(t);
+                      }}
+                      className="text-[var(--admin-text-secondary,#a1a1aa)] opacity-40 hover:opacity-100 transition-opacity p-1 absolute top-3 right-3">
+                      <X size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ),
+                { position: "top-right", duration: 6000 }
+              );
+            }
+          }
         }
-      });
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "news",
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const art = payload.new;
+            if (!art) return;
+            if (isAdmin && art.status === "pending") {
+              playNotificationSound();
+              toast.info(`New Article Submitted: "${art.title}"`);
+              if (Notification.permission === "granted") {
+                new Notification("Article Submitted for Review", {
+                  body: `"${art.title}" submitted by ${art.author || "Writer"}.`,
+                });
+              }
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const art = payload.new;
+            if (!art) return;
+            if (art.submitted_by === currentUserId) {
+              if (art.needs_attention && !payload.old?.needs_attention) {
+                playNotificationSound();
+                toast.warning(`Revisions requested for "${art.title}"`);
+                if (Notification.permission === "granted") {
+                  new Notification("Article Needs Attention", {
+                    body: art.review_notes || "Editor requested changes.",
+                  });
+                }
+              } else if (art.status === "published" && payload.old?.status !== "published") {
+                playNotificationSound();
+                toast.success(`"${art.title}" was approved and published!`);
+                if (Notification.permission === "granted") {
+                  new Notification("Article Approved", {
+                    body: `"${art.title}" is live!`,
+                  });
+                }
+              } else if (art.status === "rejected" && payload.old?.status !== "rejected") {
+                playNotificationSound();
+                toast.error(`"${art.title}" was declined`);
+              }
+            } else if (isAdmin && art.status === "pending" && payload.old?.status !== "pending") {
+              playNotificationSound();
+              toast.info(`Article Resubmitted: "${art.title}"`);
+            }
+          }
+          fetchNotifications();
+        }
+      )
+      .subscribe();
 
     return () => {
-      if (feedbackChannel) supabase.removeChannel(feedbackChannel);
+      supabase.removeChannel(channel);
     };
-  }, [user, isAdmin, fetchFeedbacks]);
+  }, [user?.id, isAdmin, isWriter, canReceiveNotifications, fetchNotifications]);
 
-  // 4. Multi-Tab Synchronization via Window Storage Event Listener
+  // 4. Multi-Tab Synchronization via Window Storage Event
   useEffect(() => {
     const handleStorageChange = (e) => {
-      if (e.key === READ_FEEDBACK_KEY || e.key === null) {
-        const storedReadIds = getStoredReadIds();
-        const readSet = new Set(storedReadIds.map((id) => String(id)));
+      if (e.key === READ_NOTIFS_KEY || e.key === DISMISSED_NOTIFS_KEY || e.key === null) {
+        const readIds = new Set(getStoredIds(READ_NOTIFS_KEY));
+        const dismissedIds = new Set(getStoredIds(DISMISSED_NOTIFS_KEY));
+
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.isFeedback ? { ...n, read: readSet.has(String(n.id)) } : n
-          )
+          prev
+            .filter((n) => !dismissedIds.has(String(n.id)) && !dismissedIds.has(String(n.rawId)))
+            .map((n) => ({
+              ...n,
+              read: readIds.has(String(n.id)) || readIds.has(String(n.rawId)),
+            }))
         );
       }
     };
@@ -341,60 +752,246 @@ export const NotificationProvider = ({ children }) => {
   // 5. Action Handlers
   const markAsRead = useCallback((id) => {
     const strId = String(id);
+    const cleanId = strId.replace(/^fb-/, "").replace(/^msg-/, "").replace(/^sys-/, "");
     setNotifications((prev) =>
-      prev.map((n) => (String(n.id) === strId ? { ...n, read: true } : n))
+      prev.map((n) =>
+        String(n.id) === strId ||
+        String(n.rawId) === cleanId ||
+        n.id === `fb-${cleanId}` ||
+        n.id === `msg-${cleanId}`
+          ? { ...n, read: true }
+          : n
+      )
     );
 
-    const currentRead = getStoredReadIds();
-    if (!currentRead.includes(strId)) {
-      saveStoredReadIds([...currentRead, strId]);
-    }
+    const currentRead = getStoredIds(READ_NOTIFS_KEY);
+    const toAdd = [strId, cleanId, `fb-${cleanId}`];
+    const updated = Array.from(new Set([...currentRead, ...toAdd]));
+    saveStoredIds(READ_NOTIFS_KEY, updated);
+    window.dispatchEvent(new Event("storage"));
+  }, []);
+
+  const markAsUnread = useCallback((id) => {
+    const strId = String(id);
+    const cleanId = strId.replace(/^fb-/, "").replace(/^msg-/, "").replace(/^sys-/, "");
+    setNotifications((prev) =>
+      prev.map((n) =>
+        String(n.id) === strId ||
+        String(n.rawId) === cleanId ||
+        n.id === `fb-${cleanId}` ||
+        n.id === `msg-${cleanId}`
+          ? { ...n, read: false }
+          : n
+      )
+    );
+
+    const currentRead = getStoredIds(READ_NOTIFS_KEY);
+    const toRemove = new Set([strId, cleanId, `fb-${cleanId}`]);
+    const updated = currentRead.filter((savedId) => !toRemove.has(savedId));
+    saveStoredIds(READ_NOTIFS_KEY, updated);
+    window.dispatchEvent(new Event("storage"));
   }, []);
 
   const markAllAsRead = useCallback(() => {
     setNotifications((prev) => {
       const updated = prev.map((n) => ({ ...n, read: true }));
-      const allFbIds = updated
-        .filter((n) => n.isFeedback)
-        .map((n) => String(n.id));
-      const currentRead = getStoredReadIds();
-      const merged = Array.from(new Set([...currentRead, ...allFbIds]));
-      saveStoredReadIds(merged);
+      const allIds = updated.flatMap((n) => [
+        String(n.id),
+        String(n.rawId || ""),
+      ]).filter(Boolean);
+      const currentRead = getStoredIds(READ_NOTIFS_KEY);
+      const merged = Array.from(new Set([...currentRead, ...allIds]));
+      saveStoredIds(READ_NOTIFS_KEY, merged);
+      window.dispatchEvent(new Event("storage"));
       return updated;
     });
   }, []);
 
   const markAllFeedbacksAsRead = useCallback(() => {
     setNotifications((prev) => {
-      const updated = prev.map((n) =>
-        n.isFeedback ? { ...n, read: true } : n
-      );
-      const allFbIds = updated
-        .filter((n) => n.isFeedback)
-        .map((n) => String(n.id));
-      const currentRead = getStoredReadIds();
-      const merged = Array.from(new Set([...currentRead, ...allFbIds]));
-      saveStoredReadIds(merged);
+      const updated = prev.map((n) => (n.isFeedback ? { ...n, read: true } : n));
+      const fbIds = updated.filter((n) => n.isFeedback).flatMap((n) => [
+        String(n.id),
+        String(n.rawId || ""),
+        `fb-${n.rawId}`,
+      ]).filter(Boolean);
+      const currentRead = getStoredIds(READ_NOTIFS_KEY);
+      saveStoredIds(READ_NOTIFS_KEY, Array.from(new Set([...currentRead, ...fbIds])));
+      window.dispatchEvent(new Event("storage"));
       return updated;
     });
   }, []);
 
   const markAllMessagesAsRead = useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((n) => (!n.isFeedback ? { ...n, read: true } : n))
-    );
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.isInbox ? { ...n, read: true } : n));
+      const msgIds = updated.filter((n) => n.isInbox).map((n) => String(n.id));
+      const currentRead = getStoredIds(READ_NOTIFS_KEY);
+      saveStoredIds(READ_NOTIFS_KEY, Array.from(new Set([...currentRead, ...msgIds])));
+      window.dispatchEvent(new Event("storage"));
+      return updated;
+    });
   }, []);
 
-  const removeNotification = useCallback((id) => {
+
+  const dismissNotification = useCallback((id) => {
     const strId = String(id);
-    setNotifications((prev) => prev.filter((n) => String(n.id) !== strId));
-    const currentRead = getStoredReadIds();
-    const cleaned = currentRead.filter((storedId) => storedId !== strId);
-    saveStoredReadIds(cleaned);
+    setNotifications((prev) => prev.filter((n) => String(n.id) !== strId && String(n.rawId) !== strId));
+
+    const currentDismissed = getStoredIds(DISMISSED_NOTIFS_KEY);
+    if (!currentDismissed.includes(strId)) {
+      saveStoredIds(DISMISSED_NOTIFS_KEY, [...currentDismissed, strId]);
+    }
   }, []);
 
   const clearNotifications = useCallback(() => {
-    setNotifications([]);
+    setNotifications((prev) => {
+      const currentDismissed = getStoredIds(DISMISSED_NOTIFS_KEY);
+      const allIds = prev.map((n) => String(n.id));
+      saveStoredIds(DISMISSED_NOTIFS_KEY, Array.from(new Set([...currentDismissed, ...allIds])));
+      return [];
+    });
+  }, []);
+
+  const sendTestNotification = useCallback((customTitle, customMessage) => {
+    playNotificationSound();
+
+    const title = customTitle || "Notification System Test";
+    const description =
+      customMessage || "Audio chime and real-time alerts verified successfully.";
+    const testItem = {
+      id: `sys-${Date.now()}`,
+      rawId: Date.now(),
+      category: "system",
+      subType: "diagnostic",
+      title,
+      description,
+      senderName: "Diagnostic Engine",
+      senderAvatar: null,
+      senderEmail: null,
+      senderPhone: null,
+      status: "delivered",
+      userId: null,
+      createdAt: new Date().toISOString(),
+      read: false,
+      isFeedback: false,
+      isInbox: false,
+    };
+
+    setNotifications((prev) => [testItem, ...prev]);
+
+    toast.success(title, {
+      description,
+      icon: <Radio size={16} className="text-theme-accent" />,
+    });
+  }, []);
+
+  const triggerSystemReleaseNotification = useCallback((release) => {
+    if (!release) return;
+    playNotificationSound();
+
+    const version = release.version ? String(release.version).replace(/^v/i, "") : "Update";
+    const title = `Release v${version}: ${release.title || "Platform Update"}`;
+    const description = release.desc || release.subtitle || "New release update published on ICMU platform.";
+    const id = `sys-rel-${version}`;
+
+    const newNotif = {
+      id,
+      rawId: version,
+      category: "system",
+      subType: "release",
+      badge: release.badge || (release.isMajor ? "MAJOR RELEASE" : "FEATURE RELEASE"),
+      version,
+      title,
+      description,
+      senderName: "Platform Dev Release",
+      senderAvatar: null,
+      senderEmail: null,
+      senderPhone: null,
+      status: "released",
+      userId: null,
+      createdAt: new Date().toISOString(),
+      read: false,
+      isFeedback: false,
+      isInbox: false,
+      isArticle: false,
+      steps: Array.isArray(release.steps) ? release.steps : [],
+      targetUrl: "/dashboard",
+    };
+
+    try {
+      const stored = JSON.parse(localStorage.getItem(DEV_SYSTEM_NOTIFS_KEY) || "[]");
+      const updated = [newNotif, ...stored.filter((item) => String(item.id) !== id)].slice(0, 30);
+      localStorage.setItem(DEV_SYSTEM_NOTIFS_KEY, JSON.stringify(updated));
+    } catch {}
+
+    setNotifications((prev) => [newNotif, ...prev.filter((n) => String(n.id) !== id)]);
+
+    toast.success(`Platform Update v${version}`, {
+      description: release.title || "New update published by developers.",
+      icon: <Sparkles size={16} className="text-theme-accent" />,
+    });
+  }, []);
+
+  const triggerSystemDevUpdate = useCallback((title, description, badge = "SYSTEM UPDATE") => {
+    if (!title || !title.trim()) return;
+    playNotificationSound();
+
+    const id = `sys-dev-${Date.now()}`;
+    const newNotif = {
+      id,
+      rawId: Date.now(),
+      category: "system",
+      subType: "dev_update",
+      badge: badge || "SYSTEM UPDATE",
+      version: null,
+      title: title.trim(),
+      description: description ? description.trim() : "Developer system announcement.",
+      senderName: "Dev System Notice",
+      senderAvatar: null,
+      senderEmail: null,
+      senderPhone: null,
+      status: "broadcast",
+      userId: null,
+      createdAt: new Date().toISOString(),
+      read: false,
+      isFeedback: false,
+      isInbox: false,
+      isArticle: false,
+      steps: [],
+      targetUrl: "/dashboard",
+    };
+
+    try {
+      const stored = JSON.parse(localStorage.getItem(DEV_SYSTEM_NOTIFS_KEY) || "[]");
+      const updated = [newNotif, ...stored].slice(0, 30);
+      localStorage.setItem(DEV_SYSTEM_NOTIFS_KEY, JSON.stringify(updated));
+    } catch {}
+
+    setNotifications((prev) => [newNotif, ...prev.filter((n) => String(n.id) !== id)]);
+
+    toast.info(title, {
+      description,
+      icon: <Radio size={16} className="text-theme-accent" />,
+    });
+  }, []);
+
+  const removeSystemReleaseNotification = useCallback((version) => {
+    if (!version) return;
+    const targetVer = String(version).replace(/^v/i, "");
+    const targetSysId = `sys-rel-${targetVer}`;
+
+    try {
+      const stored = JSON.parse(localStorage.getItem(DEV_SYSTEM_NOTIFS_KEY) || "[]");
+      const updated = stored.filter(
+        (item) => item.version !== targetVer && String(item.id) !== targetSysId
+      );
+      localStorage.setItem(DEV_SYSTEM_NOTIFS_KEY, JSON.stringify(updated));
+    } catch {}
+
+    setNotifications((prev) =>
+      prev.filter((n) => n.version !== targetVer && String(n.id) !== targetSysId)
+    );
   }, []);
 
   const contextValue = useMemo(
@@ -402,29 +999,45 @@ export const NotificationProvider = ({ children }) => {
       notifications,
       unreadCount,
       permissionGranted,
-      isLoadingFeedbacks,
-      feedbackError,
+      isLoadingFeedbacks: isLoadingNotifications,
+      isLoadingNotifications,
+      feedbackError: notificationError,
+      notificationError,
       markAsRead,
+      markAsUnread,
       markAllAsRead,
       markAllFeedbacksAsRead,
       markAllMessagesAsRead,
-      removeNotification,
+      dismissNotification,
+      removeNotification: dismissNotification, // backward compat
       clearNotifications,
-      refetchFeedbacks: fetchFeedbacks,
+      clearAllNotifications: clearNotifications,
+      sendTestNotification,
+      triggerSystemReleaseNotification,
+      triggerSystemDevUpdate,
+      removeSystemReleaseNotification,
+      playNotificationSound,
+      refetchFeedbacks: fetchNotifications,
+      refetchNotifications: fetchNotifications,
     }),
     [
       notifications,
       unreadCount,
       permissionGranted,
-      isLoadingFeedbacks,
-      feedbackError,
+      isLoadingNotifications,
+      notificationError,
       markAsRead,
+      markAsUnread,
       markAllAsRead,
       markAllFeedbacksAsRead,
       markAllMessagesAsRead,
-      removeNotification,
+      dismissNotification,
       clearNotifications,
-      fetchFeedbacks,
+      sendTestNotification,
+      triggerSystemReleaseNotification,
+      triggerSystemDevUpdate,
+      removeSystemReleaseNotification,
+      fetchNotifications,
     ]
   );
 
@@ -434,4 +1047,7 @@ export const NotificationProvider = ({ children }) => {
     </NotificationContext.Provider>
   );
 };
+
+export default NotificationContext;
+
 

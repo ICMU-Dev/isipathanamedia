@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import {
   ArrowLeft,
   X,
@@ -17,6 +18,7 @@ import UpdateMediaSection from "../../components/admin/update-form/UpdateMediaSe
 import UpdateFormSection from "../../components/admin/update-form/UpdateFormSection";
 
 const CreateUpdate = () => {
+  const { adminPath } = useParams();
   const form = useUpdateForm();
 
   const {
@@ -35,6 +37,7 @@ const CreateUpdate = () => {
     setCropModalOpen,
     imageToCrop,
     setImageToCrop,
+    closeCropModal,
     extractData,
     handleFileUpload,
     handleCropComplete,
@@ -57,11 +60,19 @@ const CreateUpdate = () => {
         formData.image
       );
 
+  const closeAndExit = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(`/${adminPath || "admin"}/updates`);
+    }
+  };
+
   const handleRequestClose = () => {
     if (isHalfWritten) {
       setShowDiscardModal(true);
     } else {
-      navigate(-1);
+      closeAndExit();
     }
   };
 
@@ -109,7 +120,9 @@ const CreateUpdate = () => {
                   <LinkIcon size={16} className="text-white/40" /> Step 1: Link
                 </h3>
                 <button
+                  type="button"
                   onClick={handleRequestClose}
+                  aria-label="Close"
                   className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                   <X size={14} />
                 </button>
@@ -175,7 +188,9 @@ const CreateUpdate = () => {
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={handleRequestClose}
+                  aria-label="Close"
                   className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                   <X size={14} />
                 </button>
@@ -197,8 +212,9 @@ const CreateUpdate = () => {
 
               <div className="p-3 pt-2 mt-auto">
                 <button
+                  type="button"
                   onClick={() => setStep("form")}
-                  className="w-full py-3 rounded-2xl text-[13px] font-bold text-black bg-[var(--accent)] hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-theme-accent/20">
+                  className="w-full py-3 rounded-2xl text-[13px] font-bold text-black bg-[var(--accent)] hover:scale-[1.02] active:scale-95 transition-all shadow-md shadow-theme-accent/20 cursor-pointer">
                   Next: Details
                 </button>
               </div>
@@ -210,8 +226,9 @@ const CreateUpdate = () => {
               <div className="flex justify-between items-center p-3 pb-2 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setStep("media")}
-                    className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors">
+                    className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                     <ArrowLeft size={14} />
                   </button>
                   <h3 className="text-[14px] font-bold text-white tracking-wide flex items-center gap-2">
@@ -220,7 +237,9 @@ const CreateUpdate = () => {
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={handleRequestClose}
+                  aria-label="Close"
                   className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors cursor-pointer">
                   <X size={14} />
                 </button>
@@ -257,10 +276,7 @@ const CreateUpdate = () => {
 
       <ImageCropperModal
         isOpen={cropModalOpen}
-        onClose={() => {
-          setCropModalOpen(false);
-          setImageToCrop(null);
-        }}
+        onClose={closeCropModal}
         imageSrc={imageToCrop}
         onCropComplete={handleCropComplete}
         aspectRatio={3 / 4}
@@ -271,7 +287,7 @@ const CreateUpdate = () => {
         isOpen={showDiscardModal}
         onDiscard={() => {
           setShowDiscardModal(false);
-          navigate(-1);
+          closeAndExit();
         }}
         onKeepEditing={() => setShowDiscardModal(false)}
         title="Discard Update?"

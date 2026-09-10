@@ -1,11 +1,24 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-const ALLOWED_ORIGIN = "https://isipathanamedia.online";
+const ALLOWED_ORIGIN_ENV = Deno.env.get("ALLOWED_ORIGIN") || Deno.env.get("SITE_ORIGIN") || "";
+const ALLOWED_ORIGINS = ALLOWED_ORIGIN_ENV.split(",").map((o) => o.trim()).filter(Boolean);
+
+const isAllowedOrigin = (origin: string | null) => {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.length > 0 && ALLOWED_ORIGINS.includes(origin)) return true;
+  return (
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin.endsWith(".netlify.app")
+  );
+};
+
 const getCorsHeaders = (origin: string | null) => {
-  const isAllowed = origin === ALLOWED_ORIGIN || (origin && origin.startsWith("http://localhost:"));
+  const allowed = isAllowedOrigin(origin);
+  const allowOrigin = allowed && origin ? origin : (ALLOWED_ORIGINS[0] || "*");
   return {
-    "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGIN,
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-user-index",
   };
@@ -102,7 +115,7 @@ serve(async (req) => {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCorsHeaders(origin) });
 
-  if (origin && origin !== ALLOWED_ORIGIN && !origin.startsWith("http://localhost:")) {
+  if (origin && !isAllowedOrigin(origin)) {
     return jsonResponse({ error: "Forbidden origin" }, 403, origin);
   }
 
@@ -112,40 +125,71 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Auth check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Missing Authorization header" }, 401, origin);
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    
-    if (userError || !user) {
-      return jsonResponse({ error: "Unauthorized" }, 401, origin);
-    }
-
-    // Verify admin
-    const { data: userData, error: profileError } = await supabaseClient
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !userData || !["admin", "super_admin", "super-admin", "superadmin"].includes(userData.role)) {
-      return jsonResponse({ error: "Forbidden" }, 403, origin);
-    }
-
-    const body = await req.json();
-    const { articleId } = body;
+    const body = await req.json().catch(() => ({}));
+    const { articleId, userIndex, userId } = body;
 
     if (!articleId) {
       return jsonResponse({ error: "Missing required field: articleId" }, 400, origin);
     }
 
-    // Hardcoded keys for now as requested
-    const credentialsStr = `{"type":"service_account","project_id":"isipathanamedia-web-auth","private_key_id":"40bf63eac3449fbf419ebc768a07430c7ed2df96","private_key":"-----BEGIN PRIVATE KEY-----\\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDd+PfbfFK5wREw\\nysIgXOs5OSQywSuU9WrM7dtGA5AlIg4/gPnY92WHYC/nTtH1EO6pahB2fLs/zKQ2\\nsge1zy6FTvEBkLMkzK1v78DGpwRSQ196wzzSQRm6g3hM9xQTugz4VX1PTOtYowCv\\n/K0tJn/iEmXH4T1UVaGWOFB8JGFX2cUGESX9hgQdtsqNHdB/1/+XYtq3tS/I+7Yf\\n4IfbtrGBjXd9Y5tlAXMzqxdVfvOpOss4qRNCVR209FdajpnVgoc4bLTsn7MO9DhC\\nOqgk3JrztwL/NiglAvMLravrVsQn5gRKidSnWSr9iVtaLqZCUCgSLNX36Y5qPKUc\\nPfF+cgoBAgMBAAECggEAAkKWYuUqp6M91UAnW/TBLJO3XlJLfbiEnusP6ShFcoH6\\nbtHHo58/4QflOm8XiCLxiTQ1MP9Ew3OcI9iTek1IQK/EYDLNPvxb5RcsRGq2lwOk\\nplUgFpt5q3eYo3f60BXHJSbllqO6FCsiLf/2/tp5eb7B3mY87qw8iNXu4YS1mn1k\\n/ghQ4jEJK9wf3zFVojs2JgkFIU7OhxkYyGwqS97JGxr7aXT9gQ7P+PNyf9H7Uzmj\\nUwkgB3bNPTmYzqig9+5x5dBZhhCpnsEXC18sImRsEGNZSrSyqMLjBUDeZq0prsNg\\ngne5RebHwjoTk9TXtydfKuXpsBqhlvJJMpopyDejzQKBgQD/g6IODi+nKcUad0AW\\n2dFDYR6c/2fMLV67XI1zLONVxbgIoIgtpbpWG87kLTudTdghcQlcYCVLiAZZSPQQ\\nmp6W9QIkNV6LKihx+6wJBlbYBWZlG41MW7Kaajly4iWnrMpyqQdwgAnEXpKIAv5s\\nnePPckVq5j6USeM8OCozQLo7kwKBgQDeZQJlhogdot+NyEhI2OUBx9qe3sZTpzXV\\n4lD6+Yw8LT68St0UwwCKVYyh45zihXWnMQIumK1UM07+gQnBvzy6UGvW4ARtdnJv\\nhHu0MwQmbC1x1+Rx1B4d8g0syydCx5j4dYtmDA+FACdcYdDfade1IMRIPrF8RtrD\\nP43AkLsomwKBgQCrgtlJo/4asDANBtTvQcB1AQECk3JCHIZFL+gG0q+6iGBy8gbW\\n1TLR0BK9GRu2CGW2dOC6sBL4s1LHpe+mIZOocsfANE7FDURe1ndxC19J274Syj67\\nbaXifsEXO3PZLGQsOQe0XU2xEWY8g/3yPL2JJwQvsGN7OGmep3i0NJONnwJ/GFLz\\n8CbGvHcT/G3regw+//Lb9oRnLL8dJEeck9a3f91y/yUxCRRK+tZgi1RZ1GzEcYTq\\nuC36xzrVaQC0EHzaJ4akRNw7n71Uxt22qf7qdUlfrxPt6IVKxfuzdTLDGIq8MHCq\\nzn6DNAjQRUptjgIFlcn/rectgmo9gx1wY59w2QKBgQDLSGngUn++UpFGDuVi1f3L\\nhTt8oc7WZDrHOvwg5DKXlzgpbPWMZ8lj1ArdrsObESb7NIH9fidnIZXuFkHUbvWc\\nGmsstHUf2HV23uPW9yxI/1HazQIFRoj93GZhsGop1+wjVDNw82Dcpn7niBSGNmUD\\njsQBviOwdQDyhkPblksjbg==\\n-----END PRIVATE KEY-----\\n","client_email":"icmu-ga4-reader@isipathanamedia-web-auth.iam.gserviceaccount.com","client_id":"103903528365314054565","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/icmu-ga4-reader%40isipathanamedia-web-auth.iam.gserviceaccount.com","universe_domain":"googleapis.com"}`;
-    const propertyId = "530565035";
+    // ── Multi-Method Authorization Check ──
+    let isAuthorized = false;
+    const allowedRoles = ["admin", "super_admin", "super-admin", "superadmin", "writer"];
+
+    // 1. Supabase Auth JWT (if present and not just anon key)
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+      if (token && token !== anonKey) {
+        try {
+          const { data: { user } } = await supabaseClient.auth.getUser(token);
+          if (user?.id) {
+            const { data: userData } = await supabaseClient
+              .from("users")
+              .select("role, is_active")
+              .eq("id", user.id)
+              .maybeSingle();
+            if (userData && userData.is_active !== false && allowedRoles.includes(userData.role)) {
+              isAuthorized = true;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Custom header or body userIndex
+    const indexNumber = req.headers.get("x-user-index") || userIndex;
+    if (!isAuthorized && indexNumber) {
+      const { data: userData } = await supabaseClient
+        .from("users")
+        .select("id, role, is_active")
+        .eq("index_number", indexNumber.toString())
+        .maybeSingle();
+      if (userData && userData.is_active !== false && allowedRoles.includes(userData.role)) {
+        isAuthorized = true;
+      }
+    }
+
+    // 3. User ID lookup
+    if (!isAuthorized && userId) {
+      const { data: userData } = await supabaseClient
+        .from("users")
+        .select("id, role, is_active")
+        .eq("id", userId)
+        .maybeSingle();
+      if (userData && userData.is_active !== false && allowedRoles.includes(userData.role)) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return jsonResponse({ error: "Unauthorized: Valid admin or writer session required." }, 401, origin);
+    }
+
+    // Read Google Service Account credentials & GA4 property securely from Supabase secrets
+    const credentialsStr = Deno.env.get("GA4_SERVICE_ACCOUNT_JSON") || Deno.env.get("GA4_SERVICE_ACCOUNT_KEY") || Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY") || "";
+    const propertyId = Deno.env.get("GA4_PROPERTY_ID") || "";
 
     if (!credentialsStr || !propertyId) {
       return jsonResponse({
@@ -181,7 +225,7 @@ serve(async (req) => {
             fieldName: "pagePath",
             stringFilter: {
               value: `/news/${articleId}`,
-              matchType: "EXACT"
+              matchType: "CONTAINS"
             }
           }
         }
@@ -215,7 +259,7 @@ serve(async (req) => {
             fieldName: "pagePath",
             stringFilter: {
               value: `/news/${articleId}`,
-              matchType: "EXACT"
+              matchType: "CONTAINS"
             }
           }
         }

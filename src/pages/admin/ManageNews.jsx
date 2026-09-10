@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import DOMPurify from 'dompurify';
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
+import { isAdmin as checkIsAdmin, isSuperAdmin as checkIsSuperAdmin } from "../../utils/roles";
 import {
   Plus,
   Edit2,
@@ -75,23 +77,38 @@ const ManageNews = () => {
     updateManyNews,
     webUsers = [],
     fetchWebUsers,
+    fetchAdminData,
+    fetchArticleById,
     loading: isLoadingNews,
   } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { adminPath } = useParams();
 
-  const userRole = user?.role?.toLowerCase();
-  const isSuperAdmin =
-    userRole === "super_admin" ||
-    userRole === "super-admin" ||
-    userRole === "superadmin";
-  const isAdmin = isSuperAdmin || userRole === "admin";
+  const userRole = user?.role;
+  const isSuperAdmin = checkIsSuperAdmin(userRole);
+  const isAdmin = checkIsAdmin(userRole);
+
+  const location = useLocation();
+  const defaultTab = isAdmin ? "articles" : "published";
+  const rawHash = location.hash?.replace("#", "");
+  const validTabs = ["articles", "updates", "pending", "needs_attention", "published", "draft"];
+  const [activeTab, setActiveTabState] = useState(() => {
+    return validTabs.includes(rawHash) ? rawHash : defaultTab;
+  });
+
+  useEffect(() => {
+    if (validTabs.includes(rawHash)) {
+      setActiveTabState(rawHash);
+    }
+  }, [rawHash]);
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    navigate({ hash: tab }, { replace: true });
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState(
-    isAdmin ? "articles" : "published",
-  ); // admins: articles, updates, pending. writers: published, pending, draft.
   const [viewMode, setViewMode] = useState("grid"); // 'grid', 'list', 'board'
   const [boardGroupBy, setBoardGroupBy] = useState("status"); // 'status', 'author'
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
@@ -113,11 +130,63 @@ const ManageNews = () => {
   const [viewingArticle, setViewingArticle] = useState(null);
   const [modalView, setModalView] = useState("options");
   const [copiedLink, setCopiedLink] = useState(false);
+  const closedHashRef = useRef(null);
+
+  const handleCloseModal = () => {
+    closedHashRef.current = location.hash;
+    setViewingArticle(null);
+    setTimeout(() => setModalView("options"), 300);
+    if (location.hash?.startsWith("#view-") || location.hash?.startsWith("#article-")) {
+      navigate({ hash: activeTab }, { replace: true });
+    }
+  };
+
+  // Handle hashtag routing for viewing article details: #view-<id> or #article-<id>
+  useEffect(() => {
+    const hash = location.hash;
+    if (!hash) {
+      closedHashRef.current = null;
+      return;
+    }
+
+    if (closedHashRef.current === hash) {
+      return;
+    }
+
+    let targetId = null;
+    if (hash.startsWith("#view-")) {
+      targetId = hash.replace("#view-", "");
+    } else if (hash.startsWith("#article-")) {
+      targetId = hash.replace("#article-", "");
+    }
+
+    if (targetId) {
+      const found = (news || []).find(
+        (item) => String(item.id) === String(targetId)
+      );
+
+      if (found) {
+        setViewingArticle(found);
+        setModalView("view");
+      } else if (fetchArticleById) {
+        fetchArticleById(targetId, user).then((fetched) => {
+          if (fetched) {
+            setViewingArticle(fetched);
+            setModalView("view");
+          }
+        });
+      }
+    }
+  }, [location.hash, news, fetchArticleById, user]);
 
   useEffect(() => {
-    fetchNews();
-    if (fetchWebUsers) fetchWebUsers();
-  }, [fetchNews, fetchWebUsers]);
+    if (fetchAdminData) {
+      fetchAdminData();
+    } else {
+      fetchNews(false, 0, 100, true);
+      if (fetchWebUsers) fetchWebUsers();
+    }
+  }, [fetchAdminData, fetchNews, fetchWebUsers]);
 
   useEffect(() => {
     if (modalView === 'view' && viewingArticle?.id && viewingArticle.type !== 'update') {
@@ -765,94 +834,195 @@ const ManageNews = () => {
       {/* Action Options Modal */}
       <MorphingModal
         viewId={viewingArticle ? `${viewingArticle.id}-${modalView}` : null}
-        onClose={() => {
-          setViewingArticle(null);
-          setTimeout(() => setModalView("options"), 300);
-        }}
+        onClose={handleCloseModal}
         placement="responsive"
         className={modalView === "view" ? "sm:max-w-3xl lg:max-w-4xl" : "sm:max-w-md"}
       >
         <div className="w-full sm:min-w-[360px] bg-[var(--admin-card-bg,#121212)] border border-[var(--admin-border)] rounded-2xl overflow-hidden p-3 shadow-2xl">
-          {modalView === "options" && (
+          {viewingArticle && modalView === "options" && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between px-2 pb-2.5 mb-1 border-b border-[var(--admin-border)] pt-1">
                 <h3 className="text-sm font-bold text-[var(--admin-text-primary)] truncate pr-4">
-                  {viewingArticle?.title || "Manage Article"}
+                  {viewingArticle.title || "Manage Article"}
                 </h3>
                 <button
-                  onClick={() => {
-                    setViewingArticle(null);
-                    setTimeout(() => setModalView("options"), 300);
-                  }}
+                  type="button"
+                  onClick={handleCloseModal}
                   className="p-1.5 rounded-full bg-[var(--admin-input-bg)] hover:bg-[var(--admin-border)] text-[var(--admin-text-secondary)] hover:text-[var(--admin-text-primary)] transition-colors"
                 >
                   <X size={14} />
                 </button>
               </div>
 
-              {/* View Article Option */}
-              <button
-                onClick={() => setModalView("view")}
-                className="w-full px-4 py-3 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/30 border border-transparent text-sm font-medium transition-all flex items-center gap-3"
-              >
-                <Eye size={16} className="text-[var(--accent)]" /> <span>View Article Details</span>
-              </button>
-
-              {activeTab === "pending" ? (
+              {activeTab === "pending" || viewingArticle.status === "pending" ? (
                 <>
+                  {/* 1. Approve & Publish (Primary CTA) */}
                   {isAdmin && (
                     <button
+                      type="button"
                       onClick={() => setModalView("confirm-approve")}
                       className="w-full px-4 py-3 rounded-xl bg-[var(--accent)] text-black text-sm font-bold hover:opacity-95 transition-all flex items-center gap-3 shadow-[0_2px_12px_rgba(var(--accent-rgb),0.2)]"
                     >
                       <CheckCircle size={16} /> <span>Approve & Publish</span>
                     </button>
                   )}
-                  {!isAdmin && viewingArticle?.needs_attention && (
+                  {!isAdmin && viewingArticle.needs_attention && (
                     <button
+                      type="button"
                       onClick={() => handleResolveReview(viewingArticle.id)}
                       className="w-full px-4 py-3 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-400/25 text-sm font-bold transition-all flex items-center gap-3"
                     >
                       <CheckCircle size={16} /> <span>Resolve & Resubmit</span>
                     </button>
                   )}
-                  {!isAdmin && (
-                    <button
-                      onClick={() => {
-                        handleEdit(viewingArticle.id);
-                        setViewingArticle(null);
-                      }}
-                      className="w-full px-4 py-3 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/40 border border-transparent text-sm font-medium transition-all flex items-center gap-3"
-                    >
-                      <Edit2 size={16} /> <span>Edit Article</span>
-                    </button>
-                  )}
+
+                  {/* 2. Needs Attention (Editorial Feedback) */}
                   {isAdmin && (
                     <button
+                      type="button"
                       onClick={() => {
                         setNeedsAttentionModal({ isOpen: true, id: viewingArticle.id, message: "" });
                         setViewingArticle(null);
-                        setTimeout(() => setModalView("options"), 300);
+                        setModalView("options");
                       }}
                       className="w-full px-4 py-3 rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500/15 border border-orange-500/20 text-sm font-medium transition-colors flex items-center gap-3"
                     >
                       <AlertCircle size={16} /> <span>Needs Attention</span>
                     </button>
                   )}
+
+                  {/* 3. View Article Details */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalView("view");
+                      if (viewingArticle?.id) {
+                        navigate({ hash: `view-${viewingArticle.id}` }, { replace: true });
+                      }
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/30 border border-transparent text-sm font-medium transition-all flex items-center gap-3"
+                  >
+                    <Eye size={16} className="text-[var(--accent)]" /> <span>View Article Details</span>
+                  </button>
+
+                  {/* 4. Edit Article */}
+                  {(isAdmin || viewingArticle.needs_attention) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleEdit(viewingArticle.id);
+                        setViewingArticle(null);
+                        setModalView("options");
+                      }}
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/40 border border-transparent text-sm font-medium transition-all flex items-center gap-3"
+                    >
+                      <Edit2 size={16} /> <span>Edit Article</span>
+                    </button>
+                  ) : (
+                    /* Review queue lock: writer cannot edit while under review */
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium flex items-center gap-2">
+                      <Clock size={14} className="shrink-0 text-blue-400" />
+                      <span>Locked in review queue until admin review</span>
+                    </div>
+                  )}
+
+                  {/* 5. Copy Public Link & Open Link */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!viewingArticle?.id) return;
+                        const url = `${window.location.origin}/news/${viewingArticle.id}`;
+                        navigator.clipboard.writeText(url);
+                        setCopiedLink(true);
+                        toast.success("Public link copied to clipboard!");
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      }}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-white/10 border border-transparent text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                    >
+                      {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      <span>{copiedLink ? "Copied!" : "Copy Link"}</span>
+                    </button>
+                    <a
+                      href={viewingArticle?.id ? `/news/${viewingArticle.id}` : "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2.5 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-white/10 border border-transparent text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                      title="Open Public View"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+
+                  {/* 6. Delete Article (Destructive option for admin) */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setModalView("confirm-delete")}
+                      className="w-full px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/15 border border-red-500/20 text-sm font-medium transition-colors flex items-center gap-3"
+                    >
+                      <Trash2 size={16} /> <span>Delete Article</span>
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
+                  {/* View Article Option */}
                   <button
+                    type="button"
+                    onClick={() => {
+                      setModalView("view");
+                      if (viewingArticle?.id) {
+                        navigate({ hash: `view-${viewingArticle.id}` }, { replace: true });
+                      }
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/30 border border-transparent text-sm font-medium transition-all flex items-center gap-3"
+                  >
+                    <Eye size={16} className="text-[var(--accent)]" /> <span>View Article Details</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       handleEdit(viewingArticle.id);
                       setViewingArticle(null);
-                      setTimeout(() => setModalView("options"), 300);
+                      setModalView("options");
                     }}
                     className="w-full px-4 py-3 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--admin-border)] border border-transparent text-sm font-medium transition-colors flex items-center gap-3"
                   >
                     <Edit2 size={16} /> <span>Edit Article</span>
                   </button>
+
+                  {/* Copy Public Link & Open Link */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!viewingArticle?.id) return;
+                        const url = `${window.location.origin}/news/${viewingArticle.id}`;
+                        navigator.clipboard.writeText(url);
+                        setCopiedLink(true);
+                        toast.success("Public link copied to clipboard!");
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      }}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-white/10 border border-transparent text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                    >
+                      {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      <span>{copiedLink ? "Copied!" : "Copy Link"}</span>
+                    </button>
+                    <a
+                      href={viewingArticle?.id ? `/news/${viewingArticle.id}` : "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2.5 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-white/10 border border-transparent text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                      title="Open Public View"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+
                   <button
+                    type="button"
                     onClick={() => setModalView("confirm-delete")}
                     className="w-full px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/15 border border-red-500/20 text-sm font-medium transition-colors flex items-center gap-3"
                   >
@@ -868,7 +1038,12 @@ const ManageNews = () => {
               {/* Top Header */}
               <div className="flex items-center justify-between px-2 pt-1 pb-2.5 mb-2 border-b border-[var(--admin-border)]">
                 <button
-                  onClick={() => setModalView("options")}
+                  onClick={() => {
+                    setModalView("options");
+                    if (location.hash?.startsWith("#view-") || location.hash?.startsWith("#article-")) {
+                      navigate({ hash: activeTab }, { replace: true });
+                    }
+                  }}
                   className="p-1.5 rounded-full bg-[var(--admin-input-bg)] hover:bg-[var(--admin-border)] text-[var(--admin-text-secondary)] hover:text-[var(--admin-text-primary)] transition-colors flex items-center gap-1.5 text-xs font-semibold"
                 >
                   <ArrowLeft size={14} />
@@ -878,10 +1053,8 @@ const ManageNews = () => {
                   Article Preview
                 </div>
                 <button
-                  onClick={() => {
-                    setViewingArticle(null);
-                    setTimeout(() => setModalView("options"), 300);
-                  }}
+                  type="button"
+                  onClick={handleCloseModal}
                   className="p-1.5 rounded-full bg-[var(--admin-input-bg)] hover:bg-[var(--admin-border)] text-[var(--admin-text-secondary)] hover:text-[var(--admin-text-primary)] transition-colors"
                 >
                   <X size={14} />
@@ -1042,7 +1215,9 @@ const ManageNews = () => {
                     {/* Quick Link Tools */}
                     <div className="flex items-center gap-2 pt-2 border-t border-white/[0.06]">
                       <button
+                        type="button"
                         onClick={() => {
+                          if (!viewingArticle?.id) return;
                           const url = `${window.location.origin}/news/${viewingArticle.id}`;
                           navigator.clipboard.writeText(url);
                           setCopiedLink(true);
@@ -1063,7 +1238,7 @@ const ManageNews = () => {
                       </button>
 
                       <a
-                        href={`/news/${viewingArticle.id}`}
+                        href={viewingArticle?.id ? `/news/${viewingArticle.id}` : "#"}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white border border-white/[0.06] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
@@ -1232,11 +1407,30 @@ const ManageNews = () => {
                   {/* Actions Footer */}
                   <div className="pt-3 border-t border-[var(--admin-border)] flex gap-2">
                     <button
-                      onClick={() => setModalView("options")}
-                      className="flex-1 py-2.5 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/40 border border-[var(--admin-border)] text-xs font-bold transition-all"
+                      type="button"
+                      onClick={() => {
+                        setModalView("options");
+                        if (location.hash?.startsWith("#view-") || location.hash?.startsWith("#article-")) {
+                          navigate({ hash: activeTab }, { replace: true });
+                        }
+                      }}
+                      className="flex-1 py-2.5 rounded-xl bg-[var(--admin-input-bg)] text-[var(--admin-text-primary)] hover:border-[var(--accent)]/40 border border-[var(--admin-border)] text-xs font-bold transition-all cursor-pointer"
                     >
                       Back to Options
                     </button>
+                    {(isAdmin || viewingArticle.status === "draft" || viewingArticle.needs_attention) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseModal();
+                          handleEdit(viewingArticle.id);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-theme-accent text-black hover:opacity-90 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Edit2 size={13} />
+                        <span>Edit Article</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1328,35 +1522,46 @@ const ManageNews = () => {
       </MorphingModal>
 
       {/* Needs Attention Modal */}
-      {needsAttentionModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-[var(--admin-card-bg)] border border-theme rounded-3xl w-full max-w-md p-6 shadow-2xl flex flex-col gap-4">
+      {needsAttentionModal.isOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setNeedsAttentionModal({ isOpen: false, id: null, message: "" });
+          }}
+        >
+          <div
+            className="bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-3xl w-full max-w-md p-6 shadow-2xl flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-xl font-bold text-white">Needs Attention</h3>
             <p className="text-sm text-theme-primary/60">
               Provide a message explaining what needs to be fixed before this can be published.
             </p>
             <textarea
-              className="w-full h-32 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-theme-accent focus:bg-white/10 transition-colors custom-scrollbar resize-none"
+              className="w-full h-32 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:border-theme-accent focus:bg-white/10 transition-colors custom-scrollbar resize-none text-sm"
               placeholder="e.g. Please update the cover image to match brand guidelines."
               value={needsAttentionModal.message}
               onChange={(e) => setNeedsAttentionModal(prev => ({ ...prev, message: e.target.value }))}
             />
             <div className="flex justify-end gap-3 mt-2">
               <button
+                type="button"
                 onClick={() => setNeedsAttentionModal({ isOpen: false, id: null, message: "" })}
-                className="px-6 py-2.5 rounded-2xl font-bold text-sm bg-white/5 hover:bg-white/10 text-white transition-colors"
+                className="px-6 py-2.5 rounded-2xl font-bold text-sm bg-white/5 hover:bg-white/10 text-white transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={submitNeedsAttention}
-                className="px-6 py-2.5 rounded-2xl font-bold text-sm bg-orange-500 hover:bg-orange-600 text-white transition-colors flex items-center gap-2"
+                className="px-6 py-2.5 rounded-2xl font-bold text-sm bg-orange-500 hover:bg-orange-600 text-white transition-colors flex items-center gap-2 cursor-pointer"
               >
                 <Ban size={16} /> Return to Writer
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Create New Modal */}

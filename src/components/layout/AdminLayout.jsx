@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, Link, useParams, useLocation } from "react-router-dom";
+import { Outlet, Link, useParams, useLocation, Navigate } from "react-router-dom";
 import AdminSidebar from "../auth/AdminSidebar";
 import { useAuth } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
@@ -11,7 +11,6 @@ import MobileHeader from "./MobileHeader";
 import { AnimatePresence } from "framer-motion";
 import PageTransition from "../ui/PageTransition";
 import MaintenanceBanner from "./MaintenanceBanner";
-import FeedbackWidget from "../admin/FeedbackWidget";
 import PWAInstallModal from "../admin/PWAInstallModal";
 import Loader from "../ui/Loader";
 import {
@@ -65,27 +64,7 @@ const AdminLayout = () => {
   // Restrict access if not authorized for admin dashboard
   if (!hasAdminDashboardAccess) {
     const returnPath = getDefaultDashboardPath(role, adminPath);
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-[color:var(--admin-bg)] text-center px-4 animate-fade-in">
-        <ShieldAlert
-          size={48}
-          className="text-[color:var(--accent)] mb-6 animate-pulse"
-        />
-        <h2 className="text-2xl font-semibold tracking-tight text-theme-primary mb-2">
-          Area Restricted
-        </h2>
-        <p className="text-sm text-theme-primary opacity-70 mb-8 max-w-md">
-          Your clearance [{role || "unknown"}] is restricted. Access to the Main
-          Admin Dashboard is denied.
-        </p>
-        <Link
-          to={returnPath}
-          className="flex items-center justify-center gap-3 px-6 min-h-[44px] admin-card border-theme hover:bg-[var(--admin-border)] opacity-80 text-theme-primary rounded-2xl transition-all duration-200 text-sm font-medium hover:scale-[1.02] active:scale-95">
-          <ArrowLeft size={18} />
-          Return to Authorized Zone
-        </Link>
-      </div>
-    );
+    return <Navigate to={returnPath} replace />;
   }
 
   // Strict Route Guard for Writers
@@ -171,7 +150,7 @@ const AdminLayout = () => {
             className={`relative z-10 lg:px-8  sm:py-6 lg:py-8 p-4 pb-20 md:pb-8 transition-all duration-300 ease-out ${
               isCollapsed ? "lg:ml-20" : "lg:ml-64"
             }`}>
-            <div className="max-w-[1600px] mx-auto" style={{ contentVisibility: 'auto', containIntrinsicSize: '1000px' }}>
+            <div className="max-w-[1600px] mx-auto">
               <MaintenanceBanner />
               <AnimatePresence mode="wait">
                 <PageTransition key={location.pathname}>
@@ -184,7 +163,6 @@ const AdminLayout = () => {
           </main>
 
           <BottomNavbar />
-          <FeedbackWidget />
 
           {/* bottom navnar shade */}
           <div 

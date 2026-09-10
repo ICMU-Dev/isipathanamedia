@@ -7,18 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- **GA4 Admin Analytics Integration**: Integrated Google Analytics 4 (GA4) via a secure Supabase Edge Function (`get-ga4-metrics`). The Admin Panel now displays real-time article performance metrics (views, user trends, device breakdown) without exposing credentials.
-- **Instagram-Style News Feed**: Migrated the public news page to a mobile-first, vertical scrolling feed with edge-to-edge images and unified `ArticleCard` components.
-- **Subtext Logic**: Added dynamic subtext for articles (displaying the ICMU profile and submitter name) and updates (displaying the submitter directly without ICMU branding).
-- **Social SVG Icons**: Added brand SVG icons (Facebook, Instagram) to replace text badges.
+## [2.0.0] - 2026-09-10
 
-### Changed
-- **Component Modularization**: Split the top 10 monolithic files in the codebase into smaller, manageable sub-components.
-- **Documentation**: Rewrote the root `README.md` to accurately reflect the ICMU Web Platform architecture and deleted outdated boilerplate documentation.
-- **Memory/System Docs**: Updated the AI memory index (`MEMORY.md`) to include recent UI, technical, and refactoring decisions.
+ICMU Web platform featuring the all-new V2 design system, a real-time notification hub, masonry article galleries, privacy-first GA4 analytics, blazing-fast data caching, and a zero-leak edge security architecture.
 
-### Removed
-- **MPMU & Nethinethera Modules**: Completely deleted the MPMU admin panel, Nethinethera admin panel, and all related features, services, hooks, and edge functions to streamline the platform.
-- **Voting Sections**: Removed MPMU-specific voting sections (VotingPreview, MpmuNominees) from the public `/nethinethera` page.
-- **Old Docs**: Removed the generic `docs/` folder, `PROJECT.md`, and old task artifacts.
+### Highlights
+- **ICMU V2 Design System**: Brand-new liquid UI theme with fluid micro-interactions, responsive form controls, and modern dark aesthetics
+- **Centralized Notification Hub**: Real-time alert center with audio chime, category filtering (Inbox, Articles, Feedback, System), and unread tracking.
+- **Masonry Article Media**: Dynamic image masonry grid for high-impact photo journalism and article media.
+- **GA4 Article Analytics**: Real-time view counts and reader engagement powered by secure edge functions.
+- **Platform Documentation**: Integrated guides, developer references, and operational docs.
+- **Zero-Leak Secret Management**: Hardcoded API keys, private tokens, and environment secrets completely removed from client bundles and routed through hardened Supabase Edge Functions
+- **Avatar & Profile Pictures**: Fixed loading deadlocks and fallback letter flickers across the top bar, sidebar, active admins, and mobile nav
+- **Article System**: Streamlined editor lifecycle, auto-saving, and draft workflows.
+- **Admin & Broadcaster Roles**: Resolved role redirects, dashboard permission guards, and broadcaster view boundaries.
+- **Release Manager**: Automated SemVer release pipeline synchronized directly with CHANGELOG.md and live system notifications
+

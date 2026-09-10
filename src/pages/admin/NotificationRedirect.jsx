@@ -11,9 +11,10 @@ const NotificationRedirect = () => {
 
   const searchParams = new URLSearchParams(window.location.search);
   const to = searchParams.get("to") || "settings";
+  const hash = window.location.hash || "";
 
   if (user && user.indexNumber) {
-    return <Navigate to={`/${user.indexNumber}/dashboard/${to}`} replace />;
+    return <Navigate to={`/${user.indexNumber}/dashboard/${to}${hash}`} replace />;
   }
 
   // Fallback to home if not logged in

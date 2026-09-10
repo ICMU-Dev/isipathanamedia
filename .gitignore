@@ -29,11 +29,31 @@ Thumbs.db
 
 # lint/temp outputs
 lint*.txt
+*.log
+*.tmp
+*.diff
+*.patch
+temp/
+.temp/
 
 # one-off SQL
 *.sql
 
-# AG Kit folders
+# graphify dev outputs
+graphify-out/
+.graphify*
+
+# Agent & Dev tooling
 .agents/
 .agent/
 .ag-kit-backups/
+.skills/
+skills/
+.gemini/
+.claude/
+.cursor/
+
+# Testing artifacts
+test-results/
+coverage/
+

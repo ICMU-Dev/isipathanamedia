@@ -11,6 +11,7 @@ import {
   GripHorizontal,
   X,
   Download,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
@@ -159,6 +160,12 @@ const BottomNavbar = () => {
       icon: <MessageSquare size={18} />,
       roles: ["admin", "super_admin"],
       hasNotification: unreadMessages > 0,
+    },
+    {
+      name: "Tools",
+      path: `${basePath}/dashboard/tools`,
+      icon: <Wrench size={18} />,
+      roles: ["admin", "super_admin"],
     },
     ...(hasBroadcasterAccess
       ? [

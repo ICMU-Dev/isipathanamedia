@@ -65,6 +65,14 @@
   }
 
   /* Admin Base Utilities */
+  .contact-menu-surface {
+    background-color: var(--admin-card-bg, #111113);
+    background-color: color-mix(in srgb, var(--admin-card-bg, #111113) 95%, var(--admin-text-primary, #fff));
+    color: var(--admin-text-primary, #fff);
+    border: 1px solid color-mix(in srgb, var(--admin-text-primary, #fff) 14%, transparent);
+    box-shadow: 0 16px 40px rgb(0 0 0 / 28%), 0 4px 12px rgb(0 0 0 / 18%);
+  }
+
   .bg-theme-bg {
     background-color: var(--admin-bg, #000);
     transition: background-color 0.2s ease;

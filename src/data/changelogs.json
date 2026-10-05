@@ -1,5 +1,22 @@
 [
   {
+    "id": "v2-1-1",
+    "version": "2.1.1",
+    "title": "New Feature : Tools",
+    "subtitle": "Feature Release",
+    "badge": "FEATURE RELEASE",
+    "desc": "Added new feature called \"tools: that allows to use for Project handling, Contact 3rd parties and more. This update will roll over for next few weeks",
+    "date": "Oct 5, 2026",
+    "isoDate": "2026-10-05",
+    "isMajor": false,
+    "steps": [
+      {
+        "t": "New: ICMU Contacts",
+        "d": "Can't find contacts for projects or sponsorship? Not anymore. New Tool called ICMU Contacts is collection of contacts that can use for find contacts for each project or event you want. Please use this tool with a responsibility"
+      }
+    ]
+  },
+  {
     "id": "v2-0-1",
     "version": "2.0.1",
     "title": "Data Fetching Bug Fixes",

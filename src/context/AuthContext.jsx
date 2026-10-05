@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { syncAuthCookies, clearAuthCookies } from '../utils/broadcasterSso';
+import { clearContactsSession, readContactsSession, storeContactsSession } from '../lib/contactsSession';
 
 // ─── Session config ───────────────────────────────────────────
 const SESSION_KEY       = 'icmu_session';
@@ -48,11 +49,28 @@ function loadSession() {
 }
 
 function clearSession() {
+    const contactsSession = readContactsSession();
+    clearContactsSession();
+    if (contactsSession) {
+        void Promise.resolve(supabase.rpc('revoke_contacts_session', { p_token: contactsSession.token })).catch(() => {});
+    }
+    void supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     try { 
         localStorage.removeItem(SESSION_KEY);
         sessionStorage.removeItem(SESSION_KEY);
         clearAuthCookies();
     } catch (_) {}
+}
+
+// Existing login UX is unchanged. Only the private contacts directory uses this proof.
+async function establishContactsSession(indexNumber, password, rememberMe) {
+    clearContactsSession();
+    try {
+        const { data, error } = await supabase.rpc('create_contacts_session', {
+            p_index_number: indexNumber, p_password: password, p_remember_me: rememberMe,
+        }).abortSignal(AbortSignal.timeout(10000));
+        if (!error && data?.token) storeContactsSession(data, rememberMe);
+    } catch { /* A contacts outage must not prevent the existing admin login. */ }
 }
 
 
@@ -412,6 +430,7 @@ export const AuthProvider = ({ children }) => {
                 rememberMe:  rememberMe,
             };
 
+            await establishContactsSession(indexNumber, password, rememberMe);
             saveSession(profile, rememberMe);
             localStorage.setItem("icmu_admin_path", `/${data.index_number}/dashboard`);
             setUser(profile);
@@ -456,6 +475,7 @@ export const AuthProvider = ({ children }) => {
                 rememberMe:  true, // Default to true for new setups
             };
 
+            await establishContactsSession(indexNumber, password, true);
             saveSession(profile, true);
             localStorage.setItem("icmu_admin_path", `/${data.index_number}/dashboard`);
             setUser(profile);
@@ -515,6 +535,7 @@ export const AuthProvider = ({ children }) => {
                 rememberMe:  rememberMe,
             };
 
+            clearContactsSession();
             saveSession(profile, rememberMe);
             localStorage.setItem("icmu_admin_path", `/${dbUser.index_number}/dashboard`);
             setUser(profile);

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-05
+
+Added new feature called "tools: that allows to use for Project handling, Contact 3rd parties and more. This update will roll over for next few weeks
+
+### Highlights
+- **New: ICMU Contacts**: Can't find contacts for projects or sponsorship? Not anymore. New Tool called ICMU Contacts is collection of contacts that can use for find contacts for each project or event you want. Please use this tool with a responsibility
+
 ## [2.0.1] - 2026-09-10
 
 Fixed some minor issues with Admin + Broadcaster Role, Updates caption bugs and Data Fetching issues.

@@ -38,6 +38,12 @@ temp/
 
 # one-off SQL
 *.sql
+!supabase/migrations/*_admin_contacts_saver.sql
+!supabase/migrations/*_contacts_session_boundary.sql
+!supabase/migrations/*_contacts_quick_entry.sql
+!supabase/migrations/*_contacts_service_categories.sql
+!supabase/migrations/*_contacts_multiple_phones.sql
+!supabase/tests/contacts_saver.sql
 
 # graphify dev outputs
 graphify-out/

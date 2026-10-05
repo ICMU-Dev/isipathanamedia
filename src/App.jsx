@@ -58,6 +58,8 @@ const CreateArticle = React.lazy(() => import("./pages/admin/CreateArticle"));
 const CreateUpdate = React.lazy(() => import("./pages/admin/CreateUpdate"));
 const ManageTeam = React.lazy(() => import("./pages/admin/ManageTeam"));
 const AdminMessages = React.lazy(() => import("./pages/admin/AdminMessages"));
+const ContactsSaver = React.lazy(() => import("./pages/admin/ContactsSaver"));
+const Tools = React.lazy(() => import("./pages/admin/Tools"));
 const Settings = React.lazy(() => import("./pages/admin/Settings"));
 const LiveStreamSettings = React.lazy(() => import("./pages/admin/LiveStreamSettings"));
 const UserProfile = React.lazy(() => import("./pages/admin/UserProfile"));
@@ -120,6 +122,8 @@ function App() {
                     <Route path="team" element={<ManageTeam />} />
                     <Route path="users" element={<Navigate to="../team" replace />} />
                     <Route path="messages" element={<AdminMessages />} />
+                    <Route path="tools" element={<Tools />} />
+                    <Route path="tools/contacts" element={<ContactsSaver />} />
                     <Route path="live" element={<LiveStreamSettings />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="feedbacks" element={<Navigate to="../settings#feedbacks" replace />} />

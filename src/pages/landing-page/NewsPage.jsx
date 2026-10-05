@@ -25,6 +25,7 @@ import {  AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import ImageWithLoader from "../../components/ui/ImageWithLoader";
 import { getPublicAuthorName, isInstitutionAuthor } from "../../utils/authorUtils";
+import { articleText } from '../../utils/articleText';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
@@ -38,9 +39,7 @@ const getReadingTime = (content) => {
 
 const getPreview = (content) => {
   if (!content) return "";
-  const temp = document.createElement("div");
-  temp.innerHTML = content;
-  const text = temp.textContent || temp.innerText || "";
+  const text = articleText(content);
   return text.substring(0, 140) + "...";
 };
 

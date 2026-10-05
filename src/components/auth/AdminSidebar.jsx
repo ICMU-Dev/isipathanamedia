@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Bell,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -23,13 +24,13 @@ import MainLogos from "../../assets/main-logos.png";
 import ActiveAdmins from "../layout/ActiveAdmins";
 import NotificationDropdown from "../layout/NotificationDropdown";
 import { UserAvatar } from "../ui/avatar";
+// eslint-disable-next-line no-unused-vars -- motion components are used in JSX.
 import { motion, AnimatePresence } from "framer-motion";
 import {
   isAdmin,
   isSuperAdmin,
   isWriter,
   canAccessBroadcastDashboard,
-  canAccessSuperAdminDashboard,
   getBroadcasterAdminUrl,
 } from "../../utils/roles";
 
@@ -49,15 +50,10 @@ const AdminSidebar = ({
   const role = user?.role;
   const isSuper = isSuperAdmin(role);
   const isAdm = isAdmin(role);
-  const isWrit = isWriter(role);
+  const isWrit = isWriter(role) && !isAdm;
   const hasBroadcasterAccess = canAccessBroadcastDashboard(role);
   const basePath = `/${adminPath}`;
-
-  // Unread feedback count
-  const unreadFeedbackCount = React.useMemo(() => {
-    if (!notifications) return 0;
-    return notifications.filter((n) => !n.read).length;
-  }, [notifications]);
+  const toolsActive = location.pathname.startsWith(`${basePath}/dashboard/tools`);
 
   const pendingCount = news?.filter((n) => n.status === "pending").length || 0;
   const showAttentionBadge = isAdm && pendingCount > 0;
@@ -73,7 +69,7 @@ const AdminSidebar = ({
   const showMessagesBadge = isAdm && unreadMessages > 0;
 
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => location.pathname === path || (path === `${basePath}/dashboard/tools` && toolsActive);
 
   // On mobile (isOpen), always show full sidebar regardless of isCollapsed
   const collapsed = isCollapsed && !isOpen;
@@ -122,6 +118,12 @@ const AdminSidebar = ({
         ]
       : []),
     {
+      name: "Tools",
+      path: `${basePath}/dashboard/tools`,
+      icon: <Wrench size={18} />,
+      roles: ["admin", "super_admin"],
+    },
+    {
       name: "Profile",
       path: `${basePath}/dashboard/profile`,
       icon: <UserIcon size={18} />,
@@ -144,10 +146,16 @@ const AdminSidebar = ({
   const navItems = allNavItems.filter((item) =>
     item.roles.includes(normalizedRole),
   );
+  const navGroups = [
+    { name: 'Workspace', items: ['Overview', 'Newsroom', 'Team'] },
+    { name: 'Communication', items: ['Messages', 'Live Stream', 'Broadcast Hub'] },
+    { name: 'Utilities & account', items: ['Tools', 'Profile', 'Settings'] },
+  ].map(group => ({ ...group, items: navItems.filter(item => group.items.includes(item.name)) }))
+    .filter(group => group.items.length > 0);
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 flex flex-col h-[100dvh] pt-5 pb-5 transition-all duration-300 ease-out border-r lg:translate-x-0 bg-[var(--admin-card-bg,#111)] border-[var(--admin-border,rgba(255,255,255,0.08))] text-[var(--admin-text-primary,#fff)] ${
+      className={`fixed top-0 left-0 z-50 flex flex-col h-[100dvh] pt-5 pb-5 lg:py-4 transition-all duration-300 ease-out border-r lg:translate-x-0 bg-[var(--admin-card-bg,#111)] border-[var(--admin-border,rgba(255,255,255,0.08))] text-[var(--admin-text-primary,#fff)] ${
         collapsed ? "lg:w-20" : "lg:w-64"
       } ${isOpen ? "translate-x-0 w-64" : "-translate-x-full w-64 lg:translate-x-0"}`}>
       {/* Mobile Close Button */}
@@ -163,7 +171,7 @@ const AdminSidebar = ({
       </button>
 
       {/* Sidebar Header */}
-      <div className="px-4 mb-5 relative group">
+      <div className="px-4 mb-5 lg:mb-4 relative group">
         <div
           className={`flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
           <Link
@@ -228,18 +236,15 @@ const AdminSidebar = ({
       </div>
 
       {/* Divider */}
-      <div className="mx-4 border-t border-theme-base mb-4" />
+      <div className="mx-4 border-t border-theme-base mb-3" />
 
       {/* Navigation */}
-      <div className="flex-1 px-3 overflow-y-auto scrollbar-hide">
-        {!collapsed && (
-          <p className="text-[10px] font-medium uppercase tracking-widest text-theme-primary opacity-25 px-3 mb-3">
-            Menu
-          </p>
-        )}
-
-        <nav className="space-y-0.5">
-          {navItems.map((item) => {
+      <div className="min-h-0 flex-1 px-3 overflow-y-auto scrollbar-hide">
+        <nav aria-label="Admin navigation">
+          {navGroups.map((group, index) => <div key={group.name} className={index ? 'mt-3 border-t border-theme-base pt-3' : ''}>
+            {!collapsed && <p className="mb-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.14em] text-theme-primary opacity-35">{group.name}</p>}
+            <div className="space-y-0.5">
+          {group.items.map((item) => {
             const isExternal = item.external || (typeof item.path === 'string' && item.path.startsWith('http'));
             const active = !isExternal && isActive(item.path);
 
@@ -277,7 +282,7 @@ const AdminSidebar = ({
                       initial={{ opacity: 0, width: 0 }}
                       animate={{ opacity: 1, width: "auto" }}
                       exit={{ opacity: 0, width: 0 }}
-                      className="text-[13px] tracking-wide whitespace-nowrap overflow-hidden flex-1 flex items-center justify-between">
+                      className="text-[13px] lg:text-xs whitespace-nowrap overflow-hidden flex-1 flex items-center justify-between">
                       <span>{item.name}</span>
                       {isExternal && (
                         <ExternalLink size={12} className="opacity-40 group-hover:opacity-80 ml-1.5 shrink-0" />
@@ -325,14 +330,14 @@ const AdminSidebar = ({
               </>
             );
 
-            const className = `group flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-150 relative ${
+            const className = `group flex min-h-11 lg:min-h-9 items-center gap-3 lg:gap-2.5 px-3 py-2.5 lg:py-2 rounded-xl transition-all duration-150 relative focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${
               collapsed ? "justify-center" : ""
             } ${
               active
                 ? item.name === "Live Stream"
                   ? "bg-red-600/10 text-theme-primary font-medium"
                   : "bg-[color:var(--accent)]/10 text-theme-primary font-medium"
-                : "text-theme-primary opacity-45 hover:bg-white/[0.03] hover:text-theme-primary"
+                : "text-theme-primary opacity-55 hover:bg-[var(--admin-border)] hover:opacity-100"
             }`;
 
             if (isExternal) {
@@ -356,6 +361,7 @@ const AdminSidebar = ({
               <Link
                 key={item.path}
                 to={item.path}
+                aria-current={active ? 'page' : undefined}
                 onClick={onClose}
                 title={collapsed ? item.name : undefined}
                 className={className}>
@@ -363,16 +369,19 @@ const AdminSidebar = ({
               </Link>
             );
           })}
+            </div>
+          </div>)}
         </nav>
+
       </div>
 
       {/* Notifications & Activity */}
-      <div className="px-4 mb-2">
+      <div className="px-4 mb-2 mt-3 lg:mt-2 shrink-0">
         <NotificationDropdown isCollapsed={collapsed} />
       </div>
 
       {/* Active Admins */}
-      <div className="px-4 mb-2">
+      <div className="px-4 mb-2 lg:mb-1 shrink-0">
         <ActiveAdmins isCollapsed={collapsed} />
       </div>
 
@@ -392,7 +401,7 @@ const AdminSidebar = ({
                 exit={{ opacity: 0, display: "none" }}
                 transition={{ duration: 0.15 }}>
                 {/* User Info */}
-                <div className="flex items-center gap-3 px-2 py-2 mb-2">
+                <div className="flex items-center gap-3 px-2 py-2 mb-2 lg:mb-1">
                   <UserAvatar
                     user={user}
                     size="default"

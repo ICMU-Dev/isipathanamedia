@@ -1,8 +1,7 @@
-import { motion } from "framer-motion";
 "use client";
 // beui.dev/components/motion/tabs
 
-import {  MotionConfig, useReducedMotion } from "motion/react";
+import { motion as Motion, MotionConfig, useReducedMotion } from "motion/react";
 import {
   createContext,
   useCallback,
@@ -62,9 +61,9 @@ export function Tabs({
             inside fixed/scrolled containers it would replay scroll offsets as
             movement. The pill only ever travels within the list, so scoping
             projection to the Tabs wrapper is always correct. */}
-        <motion.div layoutRoot className={className}>
+        <Motion.div layoutRoot className={className}>
           {children}
-        </motion.div>
+        </Motion.div>
       </TabsCtx.Provider>
     </MotionConfig>
   );
@@ -76,10 +75,10 @@ const listClasses = {
   segment: "inline-flex items-center gap-0 rounded-2xl bg-card p-0.5",
 };
 
-export function TabsList({ children, className }) {
+export function TabsList({ children, className, ...props }) {
   const { variant } = useTabs();
   return (
-    <div role="tablist" className={cn(listClasses[variant], className)}>
+    <div role="tablist" className={cn(listClasses[variant], className)} {...props}>
       {children}
     </div>
   );
@@ -90,6 +89,7 @@ export function TabsTrigger({
   children,
   className,
   indicatorClassName,
+  ...props
 }) {
   const { value: current, setValue, layoutId, variant } = useTabs();
   const active = current === value;
@@ -100,6 +100,7 @@ export function TabsTrigger({
         type="button"
         role="tab"
         aria-selected={active}
+        {...props}
         onClick={() => setValue(value)}
         className={cn(
           "relative isolate px-3 pb-2.5 pt-1 -mb-px text-sm font-medium transition-colors min-h-[44px] inline-flex items-center",
@@ -110,7 +111,7 @@ export function TabsTrigger({
         )}>
         {children}
         {active ? (
-          <motion.span
+          <Motion.span
             layoutId={layoutId}
             className={cn(
               "absolute -bottom-px left-0 right-0 h-px bg-primary",
@@ -127,7 +128,7 @@ export function TabsTrigger({
   return (
     <div className="relative">
       {active ? (
-        <motion.span
+        <Motion.span
           layoutId={layoutId}
           style={{ borderRadius: variant === "pill" ? 9999 : 8 }}
           className={cn(
@@ -141,6 +142,7 @@ export function TabsTrigger({
         type="button"
         role="tab"
         aria-selected={active}
+        {...props}
         onClick={() => setValue(value)}
         className={cn(
           "relative z-10 inline-flex items-center justify-center whitespace-nowrap bg-transparent px-3.5 py-1.5 text-sm font-medium outline-none",
@@ -169,13 +171,13 @@ export function TabsContent({ value, children, className, forceMount }) {
   }
 
   return (
-    <motion.div
+    <Motion.div
       key={value}
       initial={{ opacity: 0, y: reduce ? 0 : 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: EASE_OUT }}
       className={cn("mt-4", className)}>
       {children}
-    </motion.div>
+    </Motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { readContactsSession } from './contactsSession';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
@@ -36,6 +37,14 @@ const customFetch = (url, options = {}) => {
     } catch (e) {}
   }
   
+  // Send this credential only to the contacts API, never to auth, storage, or SSO.
+  const requestUrl = new URL(url instanceof Request ? url.url : url, supabaseUrl);
+  if (requestUrl.origin === new URL(supabaseUrl).origin &&
+      /^\/rest\/v1\/(admin_contacts|rpc\/can_manage_contacts)(?:$|\/)/.test(requestUrl.pathname)) {
+    const contactsSession = readContactsSession();
+    if (contactsSession) headers.set('x-contacts-token', contactsSession.token);
+    return fetch(url, { ...options, headers, cache: 'no-store' });
+  }
   return fetch(url, { ...options, headers });
 };
 

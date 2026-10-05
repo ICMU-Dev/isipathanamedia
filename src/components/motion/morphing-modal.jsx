@@ -1,13 +1,18 @@
 "use client";
 // beui.dev/components/motion/morphing-modal
 
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion as Motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { EASE_DRAWER, SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
+import { ModalSurface } from './modal-surface';
 
-export function MorphingModal({
+export function MorphingModal({ native = false, ...props }) {
+  return native ? <ModalSurface {...props} /> : <LegacyMorphingModal {...props} />;
+}
+
+function LegacyMorphingModal({
   viewId,
   onClose,
   children,
@@ -25,7 +30,7 @@ export function MorphingModal({
   const enterScale = reduce ? 1 : 0.90;
 
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => { const frame = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(frame); }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -63,7 +68,7 @@ export function MorphingModal({
           )}
         >
           {/* Backdrop */}
-          <motion.div
+          <Motion.div
             key="backdrop"
             aria-label="Close modal"
             initial={{ opacity: 0 }}
@@ -75,7 +80,7 @@ export function MorphingModal({
           />
 
           {/* Modal Panel */}
-          <motion.div
+          <Motion.div
             key="panel"
             layout
             initial={{ opacity: 0, y: enterY, scale: enterScale }}
@@ -94,9 +99,9 @@ export function MorphingModal({
               className,
             )}
           >
-            <motion.div layout="position" className="p-2 sm:p-3">
+            <Motion.div layout="position" className="p-2 sm:p-3">
               <AnimatePresence mode="popLayout" initial={false}>
-                <motion.div
+                <Motion.div
                   key={viewId}
                   initial={
                     reduce
@@ -141,10 +146,10 @@ export function MorphingModal({
                   }
                 >
                   {children}
-                </motion.div>
+                </Motion.div>
               </AnimatePresence>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         </div>
       )}
     </AnimatePresence>,
